@@ -64,7 +64,6 @@ devices:
   - /dev/nvme0
   - /dev/nvme1
   - /dev/nvme2
-image: ghcr.io/alexbelgium/myelectricaldata-{arch}
 ingress: true
 map:
   - config:rw
