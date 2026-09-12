@@ -1,6 +1,6 @@
 {
-  "name": "HA Add-ons by alexbelgium",
+  "name": "HA Add-ons by alexbelgium (fork Marlboro62 - patch personnel)",
   "udev": true,
-  "url": "https://github.com/alexbelgium/hassio-addons",
-  "maintainer": "alexbelgium"
+  "url": "https://github.com/Marlboro62/hassio-addons",
+  "maintainer": "Marlboro62"
 }
