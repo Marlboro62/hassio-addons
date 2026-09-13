@@ -93,4 +93,4 @@ services:
 slug: enedisgateway2mqtt
 udev: true
 url: https://github.com/alexbelgium/hassio-addons
-version: "0.13.4"
+version: "0.15.1-annual-tempo.2026.09"
