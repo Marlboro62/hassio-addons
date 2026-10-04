@@ -9,6 +9,7 @@ DB_USER=myelectricaldata
 
 log() { echo "[addon] $*"; }
 gen() { head -c "$1" /dev/urandom | od -An -tx1 | tr -d ' \n'; }
+log "Version amont MyElectricalData : ${MED_VERSION:-inconnue}"
 
 # --- Options de l'add-on ---
 export MED_CLIENT_ID=$(jq -r '.med_client_id // ""' "$OPTIONS")

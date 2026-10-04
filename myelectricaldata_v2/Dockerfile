@@ -3,6 +3,8 @@ FROM ghcr.io/myelectricaldata/myelectricaldata_new/frontend:${MED_VERSION} AS fr
 
 FROM ghcr.io/myelectricaldata/myelectricaldata_new/backend:${MED_VERSION}
 USER root
+ARG MED_VERSION
+ENV MED_VERSION=${MED_VERSION}
 
 RUN mkdir -p /etc/postgresql-common \
  && echo "create_main_cluster = false" > /etc/postgresql-common/createcluster.conf \
