@@ -1,6 +1,7 @@
-FROM ghcr.io/myelectricaldata/myelectricaldata_new/frontend:latest AS frontend
+ARG MED_VERSION=2.0.0
+FROM ghcr.io/myelectricaldata/myelectricaldata_new/frontend:${MED_VERSION} AS frontend
 
-FROM ghcr.io/myelectricaldata/myelectricaldata_new/backend:latest
+FROM ghcr.io/myelectricaldata/myelectricaldata_new/backend:${MED_VERSION}
 USER root
 
 RUN mkdir -p /etc/postgresql-common \
