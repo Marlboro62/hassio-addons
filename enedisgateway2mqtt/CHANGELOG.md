@@ -1,4 +1,4 @@
-## [Non publié]
+## 0.15.1-annual-tempo.2026.10.1 (2026-10-04)
 
 ### Corrigé
 - `last_month` et `last_month_last_year` valaient 0 le 1er du mois (date UTC), car la
