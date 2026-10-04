@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.2
+
+Basé sur [MyElectricalData 2.0.2](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.0.2) :
+
+- Corrections de la compatibilité v5 de la passerelle (2.0.1, 2.0.2).
+- Consentement Enedis Data Connect sans code (2.0.1).
+- Problème connu : la synchro des mesures Linky ne fonctionne pas encore avec le client 2.0.x (contrat illisible, 0 enregistrement), signalé au mainteneur.
+
 ## 2.0.0.1
 
 - Affiche la version amont de MyElectricalData au démarrage.
