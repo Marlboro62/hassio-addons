@@ -1,0 +1,15 @@
+configuration:
+  med_client_id:
+    name: Client ID
+    description: "Identifiant API (format cli_...), dans Paramètres > API sur www.v2.myelectricaldata.fr"
+  med_client_secret:
+    name: Client Secret
+    description: Secret API associé au Client ID
+  med_api_url:
+    name: URL de la passerelle
+    description: À ne modifier que pour un serveur MyElectricalData auto-hébergé
+  debug:
+    name: Mode debug
+    description: Logs détaillés du backend
+network:
+  8100/tcp: Interface web
