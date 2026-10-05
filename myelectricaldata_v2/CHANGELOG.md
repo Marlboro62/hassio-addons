@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.3.0
+
+Basé sur [MyElectricalData 2.3.0](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.3.0) (inclut 2.1.2 et 2.2.0) :
+
+- Calendrier EDF Zen Flex et capteurs associés, coût au calendrier.
+- Puissance maximale stockée localement, synchronisation plus économe.
+- Jours Tempo restants corrigés, préfixe des entités Home Assistant configurable.
+- Add-on : valeurs par défaut des exports adaptées à Home Assistant (URL http://homeassistant:8123, broker MQTT core-mosquitto).
+
 ## 2.1.1
 
 Basé sur [MyElectricalData 2.1.1](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.1.1) :
