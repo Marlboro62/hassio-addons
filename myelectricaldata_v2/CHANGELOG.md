@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.4.1
+
+Basé sur [MyElectricalData 2.4.1](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.4.1) :
+
+- La page Préférences (période d'analyse) fait désormais partie de MyElectricalData (2.4.0, PR #118, et ses corrections en 2.4.1, PR #131) : le correctif local de l'add-on est retiré.
+
 ## 2.3.0
 
 Basé sur [MyElectricalData 2.3.0](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.3.0) (inclut 2.1.2 et 2.2.0) :
