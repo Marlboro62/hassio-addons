@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.1.1
+
+Basé sur [MyElectricalData 2.1.1](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.1.1) :
+
+- Puissance maximale mise en cache jour par jour (moins d'appels à la passerelle).
+- Les jours sans mesure ne sont plus redemandés à chaque synchronisation.
+- Fin de période exclue des requêtes (un jour en trop corrigé).
+- La page Préférences de l'add-on reste incluse.
+
 ## 2.1.0.3
 
 - Page « Préférences » dans l'interface (menu en bas à gauche) pour choisir la période d'analyse, en attendant la fusion de la PR correspondante chez MyElectricalData. L'interface est désormais compilée par l'add-on à partir du code officiel de la version suivie, avec ce correctif.
