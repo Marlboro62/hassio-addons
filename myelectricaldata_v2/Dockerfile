@@ -1,4 +1,4 @@
-ARG MED_VERSION=2.0.2
+ARG MED_VERSION=2.1.0
 FROM ghcr.io/myelectricaldata/myelectricaldata_new/frontend:${MED_VERSION} AS frontend
 
 FROM ghcr.io/myelectricaldata/myelectricaldata_new/backend:${MED_VERSION}
