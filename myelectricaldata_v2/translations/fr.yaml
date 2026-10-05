@@ -17,5 +17,11 @@ configuration:
   import_v1_path:
     name: Base de la v1
     description: "Chemin du fichier cache.db de la v1. Par défaut, celui de l'add-on v1 de ce Home Assistant. Si la v1 est ailleurs, copiez cache.db dans /share et indiquez /share/cache.db."
+  periode_analyse:
+    name: Période d'analyse
+    description: "Période de référence des statistiques annuelles (le mode client n'a pas encore de page Préférences). « defaut » ne change rien."
+  periode_debut:
+    name: Date de début (jour/mois)
+    description: "Utilisée avec « personnalisee », par exemple 13/10 pour une facture du 13 octobre au 12 octobre."
 network:
   8100/tcp: Interface web

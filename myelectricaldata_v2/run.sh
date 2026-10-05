@@ -60,6 +60,25 @@ if [ "$(jq -r '.import_v1 // false' "$OPTIONS")" = "true" ]; then
     || log "Import v1 en échec : démarrage normal, aucune donnée n'a été modifiée"
 fi
 
+# --- Interface : env.js et période d'analyse optionnelle ---
+PERIODE=$(jq -r '.periode_analyse // "defaut"' "$OPTIONS")
+DEBUT=$(jq -r '.periode_debut // "1/9"' "$OPTIONS")
+case "$PERIODE" in
+  tempo) PRESET=tempo ;;
+  glissante) PRESET=rolling ;;
+  calendaire) PRESET=calendar ;;
+  personnalisee) PRESET=custom ;;
+  *) PRESET="" ;;
+esac
+JOUR=$(( 10#${DEBUT%%/*} )); MOIS=$(( 10#${DEBUT##*/} ))
+{
+  printf 'window.__ENV__ = {\n  VITE_API_BASE_URL: "/api",\n  VITE_BACKEND_URL: "/api",\n  VITE_SERVER_MODE: "false",\n};\n'
+  if [ -n "$PRESET" ]; then
+    printf '(function(){var k="date-preferences-storage",m="med-addon-periode",v="%s-%d-%d",s=JSON.stringify({state:{preset:"%s",customDate:{day:%d,month:%d}},version:0});function a(){try{if(localStorage.getItem(m)!==v||!localStorage.getItem(k)){localStorage.setItem(k,s);localStorage.setItem(m,v);return true}}catch(e){}return false}a();window.addEventListener("load",function(){[1000,3000].forEach(function(t){setTimeout(function(){try{if(a()&&!sessionStorage.getItem("med-addon-reload")){sessionStorage.setItem("med-addon-reload","1");location.reload()}}catch(e){}},t)})})})();\n' "$PRESET" "$JOUR" "$MOIS" "$PRESET" "$JOUR" "$MOIS"
+  fi
+} > /var/www/med/env.js
+log "Période d'analyse : ${PERIODE}$( [ "$PRESET" = custom ] && echo " (à partir du ${JOUR}/${MOIS})" )"
+
 # --- nginx (interface web sur 8100) ---
 log "Démarrage de nginx..."
 nginx

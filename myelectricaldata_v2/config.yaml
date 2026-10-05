@@ -1,5 +1,5 @@
 name: "MyElectricalData v2"
-version: "2.1.0.1"
+version: "2.1.0.2"
 image: "marlboro62/{arch}-myelectricaldata-v2"
 slug: "myelectricaldata_v2"
 description: "Mode client MyElectricalData v2 (expérimental) : interface web, synchro Linky/Tempo et PostgreSQL intégrés"
@@ -26,6 +26,8 @@ options:
   debug: false
   import_v1: false
   import_v1_path: "/homeassistant/myelectricaldata/cache.db"
+  periode_analyse: "defaut"
+  periode_debut: "1/9"
 schema:
   med_client_id: str
   med_client_secret: password
@@ -33,3 +35,5 @@ schema:
   debug: bool
   import_v1: bool
   import_v1_path: str
+  periode_analyse: list(defaut|tempo|glissante|calendaire|personnalisee)
+  periode_debut: match(^(0?[1-9]|[12][0-9]|3[01])/(0?[1-9]|1[0-2])$)
