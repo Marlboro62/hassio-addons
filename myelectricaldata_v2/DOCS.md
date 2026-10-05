@@ -34,6 +34,10 @@ La base PostgreSQL et les secrets sont dans le dossier `/data` de l'add-on, incl
 - Activez l'option `debug` pour plus de détails.
 - Les problèmes liés à MyElectricalData lui-même se signalent sur [myelectricaldata_new](https://github.com/MyElectricalData/myelectricaldata_new/issues).
 
+## Période d'analyse
+
+La page **Préférences** (menu en bas à gauche de l'interface) permet de choisir la période des statistiques annuelles : année Tempo, glissante, calendaire ou date personnalisée (par exemple le 13 octobre pour une facture annuelle du 13/10 au 12/10). L'option « Période d'analyse » de l'onglet Configuration permet aussi de l'imposer à tous les navigateurs ; laissez-la sur « defaut » si vous préférez régler depuis l'interface.
+
 ## Migration depuis la v1
 
 L'add-on peut reprendre l'historique de consommation de l'add-on MyElectricalData v1, sans rien redemander à la passerelle (et donc sans consommer de quota).

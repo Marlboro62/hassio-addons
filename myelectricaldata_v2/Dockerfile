@@ -1,5 +1,19 @@
 ARG MED_VERSION=2.1.0
-FROM ghcr.io/myelectricaldata/myelectricaldata_new/frontend:${MED_VERSION} AS frontend
+# --- Interface : code officiel de la version suivie + correctifs de l'add-on ---
+FROM node:20-alpine AS webbuild
+ARG MED_VERSION
+RUN apk add --no-cache git
+WORKDIR /src
+RUN git clone --depth 1 --branch "${MED_VERSION}" https://github.com/MyElectricalData/myelectricaldata_new.git .
+COPY patches/ /patches/
+RUN set -e; for p in /patches/*.patch; do \
+      [ -e "$p" ] || continue; \
+      if git apply --check "$p" 2>/dev/null; then git apply "$p" && echo "Correctif appliqué : $p"; \
+      elif git apply --reverse --check "$p" 2>/dev/null; then echo "Correctif déjà intégré en amont, ignoré : $p"; \
+      else echo "ERREUR : le correctif $p ne s'applique plus sur la version ${MED_VERSION}"; exit 1; fi; \
+    done
+WORKDIR /src/apps/web
+RUN npm ci --no-audit --no-fund && npm run build
 
 FROM ghcr.io/myelectricaldata/myelectricaldata_new/backend:${MED_VERSION}
 USER root
@@ -13,7 +27,7 @@ RUN mkdir -p /etc/postgresql-common \
  && rm -rf /var/lib/apt/lists/* \
  && rm -f /etc/nginx/sites-enabled/default
 
-COPY --from=frontend /usr/share/nginx/html /var/www/med
+COPY --from=webbuild /src/apps/web/dist /var/www/med
 RUN printf 'window.__ENV__ = {\n  VITE_API_BASE_URL: "/api",\n  VITE_BACKEND_URL: "/api",\n  VITE_SERVER_MODE: "false",\n};\n' > /var/www/med/env.js \
  && chmod -R a+rX /var/www/med
 

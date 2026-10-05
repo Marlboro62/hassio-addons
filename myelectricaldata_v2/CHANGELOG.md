@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.0.3
+
+- Page « Préférences » dans l'interface (menu en bas à gauche) pour choisir la période d'analyse, en attendant la fusion de la PR correspondante chez MyElectricalData. L'interface est désormais compilée par l'add-on à partir du code officiel de la version suivie, avec ce correctif.
+
 ## 2.1.0.2
 
 - Nouvelle option « Période d'analyse » : année Tempo, glissante, calendaire ou date personnalisée (ex. 13/10 pour une facture à date anniversaire). Appliquée automatiquement dans chaque navigateur, de nouveau si l'interface l'efface ou si l'option change ; un réglage fait dans l'interface reste prioritaire.
