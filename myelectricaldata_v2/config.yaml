@@ -1,5 +1,5 @@
 name: "MyElectricalData v2"
-version: "2.1.0"
+version: "2.1.0.1"
 image: "marlboro62/{arch}-myelectricaldata-v2"
 slug: "myelectricaldata_v2"
 description: "Mode client MyElectricalData v2 (expérimental) : interface web, synchro Linky/Tempo et PostgreSQL intégrés"
@@ -9,6 +9,11 @@ arch:
   - amd64
 startup: application
 boot: auto
+map:
+  - type: homeassistant_config
+    read_only: true
+  - type: share
+    read_only: true
 ports:
   8100/tcp: 8100
 ports_description:
@@ -19,8 +24,12 @@ options:
   med_client_secret: ""
   med_api_url: "https://www.v2.myelectricaldata.fr/api"
   debug: false
+  import_v1: false
+  import_v1_path: "/homeassistant/myelectricaldata/cache.db"
 schema:
   med_client_id: str
   med_client_secret: password
   med_api_url: url
   debug: bool
+  import_v1: bool
+  import_v1_path: str

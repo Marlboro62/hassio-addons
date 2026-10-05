@@ -52,6 +52,14 @@ if [ "$(pg -c "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'")" != "1" ]; t
 fi
 export DATABASE_URL="postgresql+asyncpg://$DB_USER:$PGPASS@127.0.0.1:5432/$DB_NAME"
 
+# --- Import optionnel de l'historique de la v1 ---
+if [ "$(jq -r '.import_v1 // false' "$OPTIONS")" = "true" ]; then
+  log "Import des données MyElectricalData v1 demandé"
+  (cd /app && alembic upgrade head) || true
+  PG_BIN="$PG_BIN" DB_NAME="$DB_NAME" /import_v1.sh "$(jq -r '.import_v1_path // "/homeassistant/myelectricaldata/cache.db"' "$OPTIONS")" \
+    || log "Import v1 en échec : démarrage normal, aucune donnée n'a été modifiée"
+fi
+
 # --- nginx (interface web sur 8100) ---
 log "Démarrage de nginx..."
 nginx

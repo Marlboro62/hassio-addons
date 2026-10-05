@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.0.1
+
+- Nouvelle option : import de l'historique de consommation de l'add-on MyElectricalData v1 (journalier et courbe de charge), sans consommer de quota.
+
 ## 2.1.0
 
 Basé sur [MyElectricalData 2.1.0](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.1.0) :

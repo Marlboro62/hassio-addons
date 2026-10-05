@@ -19,7 +19,8 @@ RUN printf 'window.__ENV__ = {\n  VITE_API_BASE_URL: "/api",\n  VITE_BACKEND_URL
 
 COPY nginx.conf /etc/nginx/conf.d/med.conf
 COPY run.sh /run.sh
-RUN chmod +x /run.sh
+COPY import_v1.sh /import_v1.sh
+RUN chmod +x /run.sh /import_v1.sh
 
 WORKDIR /app
 ENTRYPOINT []

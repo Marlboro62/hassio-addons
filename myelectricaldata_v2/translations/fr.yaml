@@ -11,5 +11,11 @@ configuration:
   debug:
     name: Mode debug
     description: Logs détaillés du backend
+  import_v1:
+    name: Importer l'historique de la v1
+    description: "Au démarrage, importe la consommation de l'add-on MyElectricalData v1 (aucune donnée existante n'est écrasée). À désactiver une fois l'import terminé."
+  import_v1_path:
+    name: Base de la v1
+    description: "Chemin du fichier cache.db de la v1. Par défaut, celui de l'add-on v1 de ce Home Assistant. Si la v1 est ailleurs, copiez cache.db dans /share et indiquez /share/cache.db."
 network:
   8100/tcp: Interface web
