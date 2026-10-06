@@ -1,6 +1,6 @@
 Cet add-on est développé sur mon temps libre, par passion pour la domotique. S'il vous rend service, un café via le bouton ci-dessous fait toujours plaisir ☕
 
-[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-d32f2f?logo=buymeacoffee&logoColor=white&style=flat)](https://buymeacoffee.com/marlboro62)
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-d32f2f?logo=buymeacoffee&logoColor=white&style=flat)](https://buymeacoffee.com/marlboro62) [![Ko-fi](https://img.shields.io/badge/Ko--fi-ff5e5b?logo=kofi&logoColor=white&style=flat)](https://ko-fi.com/nothing_one)
 
 Vos retours sont tout aussi précieux : bugs, idées ou améliorations, n'hésitez pas à [ouvrir une issue](https://github.com/Marlboro62/hassio-addons/issues).
 
