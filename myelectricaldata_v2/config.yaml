@@ -3,7 +3,7 @@ version: "2.4.3"
 image: "marlboro62/{arch}-myelectricaldata-v2"
 slug: "myelectricaldata_v2"
 description: "Mode client MyElectricalData v2 (expérimental) : interface web, synchro Linky/Tempo et PostgreSQL intégrés"
-url: "https://github.com/Marlboro62/hassio-addons"
+url: "https://github.com/Marlboro62/hassio-addons/tree/master/myelectricaldata_v2"
 stage: experimental
 arch:
   - amd64
