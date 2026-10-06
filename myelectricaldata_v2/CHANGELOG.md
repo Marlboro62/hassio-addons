@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.4.3.1
+
+Version propre à l'add-on, toujours basée sur MyElectricalData 2.4.3 :
+
+- Accès PostgreSQL **en lecture seule** pour Grafana : définir l'option `grafana_password`, puis ouvrir le port 5432 dans l'onglet Réseau. Le rôle `grafana_ro` ne peut lire que les tables de mesures, de tarifs et de calendriers.
+- Documentation : options Consommation/Production à cocher sur le site, lien « Visitez la page » vers le dossier de l'add-on, description de l'option Période d'analyse mise à jour.
+
 ## 2.4.3
 
 Basé sur [MyElectricalData 2.4.3](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.4.3) :

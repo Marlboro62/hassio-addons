@@ -16,6 +16,7 @@ export MED_CLIENT_ID=$(jq -r '.med_client_id // ""' "$OPTIONS")
 export MED_CLIENT_SECRET=$(jq -r '.med_client_secret // ""' "$OPTIONS")
 export MED_API_URL=$(jq -r '.med_api_url // "https://www.v2.myelectricaldata.fr/api"' "$OPTIONS")
 export DEBUG=$(jq -r '.debug // false' "$OPTIONS")
+GRAFANA_PASS=$(jq -r '.grafana_password // ""' "$OPTIONS")
 if [ -z "$MED_CLIENT_ID" ] || [ -z "$MED_CLIENT_SECRET" ]; then
   log "ERREUR : renseignez med_client_id et med_client_secret dans la configuration."
   exit 1
@@ -37,9 +38,19 @@ if [ ! -s "$PGDATA/PG_VERSION" ]; then
   runuser -u postgres -- "$PG_BIN/initdb" -D "$PGDATA" -U postgres -E UTF8 \
     --auth-local=trust --auth-host=scram-sha-256
 fi
+
+# --- Accès Grafana optionnel (rôle grafana_ro en lecture seule) ---
+PG_LISTEN="127.0.0.1"
+HBA="$PGDATA/pg_hba.conf"
+sed -i '/# med-grafana$/d' "$HBA"
+if [ -n "$GRAFANA_PASS" ]; then
+  echo "host $DB_NAME grafana_ro 0.0.0.0/0 scram-sha-256 # med-grafana" >> "$HBA"
+  PG_LISTEN="0.0.0.0"
+fi
+
 log "Démarrage de PostgreSQL..."
 runuser -u postgres -- "$PG_BIN/pg_ctl" -D "$PGDATA" -l /data/pglog/postgres.log \
-  -o "-c listen_addresses=127.0.0.1" -w start
+  -o "-c listen_addresses=$PG_LISTEN" -w start
 
 pg() { runuser -u postgres -- "$PG_BIN/psql" -v ON_ERROR_STOP=1 -tA "$@"; }
 if [ "$(pg -c "SELECT 1 FROM pg_roles WHERE rolname='$DB_USER'")" = "1" ]; then
@@ -58,6 +69,32 @@ if [ "$(jq -r '.import_v1 // false' "$OPTIONS")" = "true" ]; then
   (cd /app && alembic upgrade head) || true
   PG_BIN="$PG_BIN" DB_NAME="$DB_NAME" /import_v1.sh "$(jq -r '.import_v1_path // "/homeassistant/myelectricaldata/cache.db"' "$OPTIONS")" \
     || log "Import v1 en échec : démarrage normal, aucune donnée n'a été modifiée"
+fi
+
+# --- Droits du rôle Grafana (après l'import, pour que les tables existent) ---
+if [ -n "$GRAFANA_PASS" ]; then
+  pg -d "$DB_NAME" -v pw="$GRAFANA_PASS" >/dev/null <<'SQL'
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'grafana_ro') THEN
+    CREATE ROLE grafana_ro;
+  END IF;
+END $$;
+ALTER ROLE grafana_ro WITH LOGIN PASSWORD :'pw';
+GRANT CONNECT ON DATABASE myelectricaldata_client TO grafana_ro;
+GRANT USAGE ON SCHEMA public TO grafana_ro;
+DO $$ DECLARE t text; BEGIN
+  FOREACH t IN ARRAY ARRAY['consumption_data','tempo_days','max_power_data',
+    'energy_offers','energy_providers','ecowatt','consumption_france',
+    'generation_forecast','production_data'] LOOP
+    IF to_regclass('public.' || t) IS NOT NULL THEN
+      EXECUTE format('GRANT SELECT ON public.%I TO grafana_ro', t);
+    END IF;
+  END LOOP;
+END $$;
+SQL
+  log "Accès Grafana activé : rôle grafana_ro (lecture seule), port 5432"
+else
+  pg -c "DO \$\$ BEGIN IF EXISTS (SELECT FROM pg_roles WHERE rolname='grafana_ro') THEN ALTER ROLE grafana_ro NOLOGIN; END IF; END \$\$;" >/dev/null
 fi
 
 # --- Interface : env.js et période d'analyse optionnelle ---
