@@ -1,6 +1,0 @@
-{
-    "build_from": {
-        "aarch64": "lscr.io/linuxserver/piwigo:arm64v8-latest",
-        "amd64": "lscr.io/linuxserver/piwigo:amd64-latest"
-    }
-}

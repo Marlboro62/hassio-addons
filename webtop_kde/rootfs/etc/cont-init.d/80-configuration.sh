@@ -1,1 +1,0 @@
-../../../../claude_desktop/rootfs/etc/cont-init.d/80-configuration.sh

@@ -1,6 +1,0 @@
-{
-  "build_from": {
-    "aarch64": "photoprism/photoprism:latest",
-    "amd64": "photoprism/photoprism:latest"
-  }
-}

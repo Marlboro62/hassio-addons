@@ -1,1 +1,0 @@
-../../../../claude_desktop/rootfs/etc/cont-init.d/20-folders.sh
