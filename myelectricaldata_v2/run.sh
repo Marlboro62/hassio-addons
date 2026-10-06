@@ -114,7 +114,44 @@ JOUR=$(( 10#${DEBUT%%/*} )); MOIS=$(( 10#${DEBUT##*/} ))
     printf '(function(){var k="date-preferences-storage",m="med-addon-periode",v="%s-%d-%d",s=JSON.stringify({state:{preset:"%s",customDate:{day:%d,month:%d}},version:0});function a(){try{if(localStorage.getItem(m)!==v||!localStorage.getItem(k)){localStorage.setItem(k,s);localStorage.setItem(m,v);return true}}catch(e){}return false}a();window.addEventListener("load",function(){[1000,3000].forEach(function(t){setTimeout(function(){try{if(a()&&!sessionStorage.getItem("med-addon-reload")){sessionStorage.setItem("med-addon-reload","1");location.reload()}}catch(e){}},t)})})})();\n' "$PRESET" "$JOUR" "$MOIS" "$PRESET" "$JOUR" "$MOIS"
   fi
 } > /var/www/med/env.js
+cat >> /var/www/med/env.js <<'JS'
+(function(){var CL="https://github.com/Marlboro62/hassio-addons/blob/master/myelectricaldata_v2/CHANGELOG.md",el=null;function draw(d){if(!d||!d.version)return;if(!el){el=document.createElement("a");el.id="med-addon-version";el.target="_blank";el.rel="noopener";el.href=CL;el.style.cssText="position:fixed;left:50%;bottom:10px;transform:translateX(-50%);z-index:9999;display:flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;font:12px/1.4 system-ui,sans-serif;text-decoration:none;color:#e5e7eb;background:rgba(17,24,39,.85);box-shadow:0 2px 8px rgba(0,0,0,.3)";document.body.appendChild(el)}var n=d.behind||(d.update?1:0),up=n>0,c=n>=2?"#ef4444":up?"#f59e0b":"#22c55e";el.style.border="1px solid "+c;el.title=up?"Mettez à jour l'add-on depuis Home Assistant (Paramètres > Modules complémentaires)":"Journal des modifications";el.innerHTML='<span style="width:8px;height:8px;border-radius:50%;background:'+c+'"></span>'+(n>=2?"Add-on "+d.version+" · <b>"+n+" versions de retard</b> (dernière : "+d.latest+")":up?"Add-on "+d.version+" · mise à jour disponible : <b>"+d.latest+"</b>":"Add-on "+d.version+" · à jour")}function load(){fetch("/addon-version.json",{cache:"no-store"}).then(function(r){return r.ok?r.json():null}).then(draw).catch(function(){})}function start(){load();setInterval(load,36e5)}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start()})();
+JS
 log "Période d'analyse : ${PERIODE}$( [ "$PRESET" = custom ] && echo " (à partir du ${JOUR}/${MOIS})" )"
+
+# --- Version de l'add-on pour l'interface (badge, via l'API du Supervisor) ---
+addon_version() {
+  [ -n "${SUPERVISOR_TOKEN:-}" ] || return 0
+  python3 - <<'PY' || true
+import json, os, urllib.request
+req = urllib.request.Request("http://supervisor/addons/self/info",
+                             headers={"Authorization": "Bearer " + os.environ["SUPERVISOR_TOKEN"]})
+try:
+    d = json.load(urllib.request.urlopen(req, timeout=10))["data"]
+except Exception:
+    raise SystemExit(0)
+behind = 0
+if d.get("update_available"):
+    behind = 1
+    try:
+        req = urllib.request.Request("http://supervisor/addons/self/changelog",
+                                     headers={"Authorization": "Bearer " + os.environ["SUPERVISOR_TOKEN"]})
+        txt = urllib.request.urlopen(req, timeout=10).read().decode("utf-8", "replace")
+        vers = [l[3:].split()[0] for l in txt.splitlines() if l.startswith("## ") and l[3:].strip()]
+        if d.get("version") in vers:
+            behind = max(1, vers.index(d.get("version")))
+    except Exception:
+        pass
+out = {"version": d.get("version"), "latest": d.get("version_latest"),
+       "update": bool(d.get("update_available")), "behind": behind,
+       "upstream": os.environ.get("MED_VERSION", "")}
+tmp = "/var/www/med/addon-version.json.tmp"
+with open(tmp, "w") as f:
+    json.dump(out, f)
+os.replace(tmp, "/var/www/med/addon-version.json")
+PY
+}
+( while true; do addon_version; sleep 3600; done ) &
 
 # --- nginx (interface web sur 8100) ---
 log "Démarrage de nginx..."

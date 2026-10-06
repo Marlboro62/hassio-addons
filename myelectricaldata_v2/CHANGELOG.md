@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.4.4.1
+
+Version propre à l'add-on, toujours basée sur MyElectricalData 2.4.4 :
+
+- Badge en bas de l'interface web : version installée de l'add-on, pastille verte « à jour », orange « mise à jour disponible », rouge à partir de 2 versions de retard (vérifié toutes les heures auprès du Supervisor, utile si l'interface reste ouverte en permanence).
+- L'add-on accède à l'API du Supervisor (`hassio_api`) uniquement pour lire ses propres informations de version.
+
 ## 2.4.4
 
 Basé sur [MyElectricalData 2.4.4](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.4.4) :
