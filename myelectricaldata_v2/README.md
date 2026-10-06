@@ -1,3 +1,5 @@
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-d32f2f?logo=buymeacoffee&logoColor=white&style=flat)](https://buymeacoffee.com/marlboro62)
+
 # MyElectricalData v2 (expérimental)
 
 Add-on **non officiel** qui fait tourner le **mode client** de [MyElectricalData v2](https://github.com/MyElectricalData/myelectricaldata_new) dans Home Assistant.
@@ -20,9 +22,3 @@ Add-on **non officiel** qui fait tourner le **mode client** de [MyElectricalData
 3. Saisissez-les dans l'onglet **Configuration** de l'add-on, puis démarrez-le.
 
 Voir l'onglet **Documentation** pour le détail.
-
-## Soutenir
-
-Si cet add-on vous fait gagner du temps ou vous rend service, vous pouvez soutenir son développement :
-
-[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-d32f2f?logo=buymeacoffee&logoColor=white&style=flat)](https://buymeacoffee.com/marlboro62)
