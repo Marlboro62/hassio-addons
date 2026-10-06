@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.4.3
+
+Basé sur [MyElectricalData 2.4.3](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.4.3) :
+
+- Statistiques Home Assistant importées de façon incrémentale, avec des sommes cumulées continues et sans rejeu (2.4.2, issue #111).
+- Cache jour par jour de la production (2.4.3).
+
 ## 2.4.1
 
 Basé sur [MyElectricalData 2.4.1](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.4.1) :

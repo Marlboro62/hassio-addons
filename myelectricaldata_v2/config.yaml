@@ -1,5 +1,5 @@
 name: "MyElectricalData v2"
-version: "2.4.1"
+version: "2.4.3"
 image: "marlboro62/{arch}-myelectricaldata-v2"
 slug: "myelectricaldata_v2"
 description: "Mode client MyElectricalData v2 (expérimental) : interface web, synchro Linky/Tempo et PostgreSQL intégrés"
