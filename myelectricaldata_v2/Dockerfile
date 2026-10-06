@@ -1,4 +1,4 @@
-ARG MED_VERSION=2.4.3
+ARG MED_VERSION=2.4.4
 # --- Interface : code officiel de la version suivie + correctifs de l'add-on ---
 FROM node:20-alpine AS webbuild
 ARG MED_VERSION

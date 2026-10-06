@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.4.4
+
+Basé sur [MyElectricalData 2.4.4](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.4.4) :
+
+- Une plage de dates refusée par Enedis (erreur ADAM-ERR0123) est mémorisée 24 h au lieu d'être redemandée à chaque synchro.
+- Comprend l'accès PostgreSQL en lecture seule pour Grafana de la 2.4.3.1.
+
 ## 2.4.3.1
 
 Version propre à l'add-on, toujours basée sur MyElectricalData 2.4.3 :
