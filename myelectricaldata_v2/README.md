@@ -1,4 +1,8 @@
+Cet add-on est développé sur mon temps libre, par passion pour la domotique. S'il vous rend service, un café via le bouton ci-dessous fait toujours plaisir ☕
+
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-d32f2f?logo=buymeacoffee&logoColor=white&style=flat)](https://buymeacoffee.com/marlboro62)
+
+Vos retours sont tout aussi précieux : bugs, idées ou améliorations, n'hésitez pas à [ouvrir une issue](https://github.com/Marlboro62/hassio-addons/issues).
 
 # MyElectricalData v2 (expérimental)
 
@@ -22,9 +26,3 @@ Add-on **non officiel** qui fait tourner le **mode client** de [MyElectricalData
 3. Saisissez-les dans l'onglet **Configuration** de l'add-on, puis démarrez-le.
 
 Voir l'onglet **Documentation** pour le détail.
-
-## Un petit mot
-
-Cet add-on est développé sur mon temps libre, par passion pour la domotique. S'il vous rend service, un café via le bouton en haut de la page fait toujours plaisir ☕
-
-Vos retours sont tout aussi précieux : bugs, idées ou améliorations, n'hésitez pas à [ouvrir une issue](https://github.com/Marlboro62/hassio-addons/issues).
