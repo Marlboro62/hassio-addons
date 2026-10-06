@@ -24,6 +24,6 @@ Add-on **non officiel** qui fait tourner le **mode client** de [MyElectricalData
 1. Créez un compte sur [www.v2.myelectricaldata.fr](https://www.v2.myelectricaldata.fr) et donnez le consentement Enedis.
 2. Récupérez votre **Client ID** et votre **Client Secret** dans **Paramètres > API**.
 3. Sur le **Tableau de bord** du site, cochez **Consommation** (et **Production** si vous produisez) sur la carte de votre PDL. L'add-on recopie ces options à chaque démarrage : sans elles, ses pages restent vides tant qu'on ne clique pas sur « Récupérer ».
-4. Saisissez-les dans l'onglet **Configuration** de l'add-on, puis démarrez-le.
+4. Saisissez le **Client ID** et le **Client Secret** dans l'onglet **Configuration** de l'add-on, puis démarrez-le.
 
 Voir l'onglet **Documentation** pour le détail.
