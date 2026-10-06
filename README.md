@@ -15,3 +15,9 @@ Dans Home Assistant : **Paramètres → Modules complémentaires → Boutique �
 - `https://github.com/Marlboro62/hassio-addons#test-myelectricaldata-v2` (branche de test).
 
 À l'origine, ce dépôt est un fork de [alexbelgium/hassio-addons](https://github.com/alexbelgium/hassio-addons), allégé pour ne garder que ces add-ons.
+
+## Soutenir
+
+Si cet add-on vous fait gagner du temps ou vous rend service, vous pouvez soutenir son développement :
+
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-d32f2f?logo=buymeacoffee&logoColor=white&style=flat)](https://buymeacoffee.com/marlboro62)
