@@ -1,6 +1,6 @@
 name: "MyElectricalData new"
 version: "2.4.4.1"
-image: "marlboro62/{arch}-myelectricaldata-new"
+image: "marlboro62/{arch}-myelectricaldata-v2"
 slug: "myelectricaldata_new"
 description: "Mode client MyElectricalData new (expérimental) : interface web, synchro Linky/Tempo et PostgreSQL intégrés"
 url: "https://github.com/Marlboro62/hassio-addons/tree/master/myelectricaldata_new"
