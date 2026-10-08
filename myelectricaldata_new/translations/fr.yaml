@@ -23,5 +23,9 @@ configuration:
   periode_debut:
     name: Date de début (jour/mois)
     description: "Utilisée avec « personnalisee », par exemple 13/10 pour une facture du 13 octobre au 12 octobre."
+  grafana_password:
+    name: Mot de passe Grafana
+    description: "Active un accès en lecture seule à la base pour Grafana (utilisateur grafana_ro). Renseignez aussi le port 5432 dans la section Réseau. Réseau local uniquement, sans SSL."
 network:
   8100/tcp: Interface web
+  5432/tcp: PostgreSQL pour Grafana (lecture seule, réseau local uniquement)
