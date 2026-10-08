@@ -1,8 +1,8 @@
-name: "MyElectricalData v2"
+name: "MyElectricalData new"
 version: "2.4.4.1"
 image: "marlboro62/{arch}-myelectricaldata-v2"
 slug: "myelectricaldata_v2"
-description: "Mode client MyElectricalData v2 (expérimental) : interface web, synchro Linky/Tempo et PostgreSQL intégrés"
+description: "Mode client MyElectricalData new (expérimental) : interface web, synchro Linky/Tempo et PostgreSQL intégrés"
 url: "https://github.com/Marlboro62/hassio-addons/tree/master/myelectricaldata_v2"
 stage: experimental
 arch:
@@ -19,8 +19,8 @@ ports:
   8100/tcp: 8100
   5432/tcp: null
 ports_description:
-  8100/tcp: "Interface web MyElectricalData"
-  5432/tcp: "PostgreSQL lecture seule pour Grafana (définir grafana_password pour activer)"
+  8100/tcp: "Interface web MyElectricalData (ne pas exposer sur Internet)"
+  5432/tcp: "PostgreSQL lecture seule pour Grafana, sans SSL, réseau local uniquement (définir grafana_password, puis renseigner un port ici)"
 webui: "http://[HOST]:[PORT:8100]"
 options:
   med_client_id: ""
