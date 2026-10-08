@@ -1,7 +1,7 @@
-name: "MyElectricalData new"
+name: "MyElectricalData New Beta"
 version: "2.4.4.1"
-image: "marlboro62/{arch}-myelectricaldata-new"
-slug: "myelectricaldata_new"
+image: "marlboro62/{arch}-myelectricaldata-v2"
+slug: "myelectricaldata_new_beta"
 description: "Mode client MyElectricalData new (expérimental) : interface web, synchro Linky/Tempo et PostgreSQL intégrés"
 url: "https://github.com/Marlboro62/hassio-addons/tree/master/myelectricaldata_new"
 stage: experimental
@@ -16,7 +16,7 @@ map:
   - type: share
     read_only: true
 ports:
-  8100/tcp: 8100
+  8100/tcp: 8101
   5432/tcp: null
 ports_description:
   8100/tcp: "Interface web MyElectricalData (ne pas exposer sur Internet)"
