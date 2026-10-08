@@ -4,19 +4,21 @@ Cet add-on est développé sur mon temps libre, par passion pour la domotique. S
 
 Vos retours sont tout aussi précieux : bugs, idées ou améliorations, n'hésitez pas à [ouvrir une issue](https://github.com/Marlboro62/hassio-addons/issues).
 
-# MyElectricalData v2 (expérimental)
+# MyElectricalData new (expérimental)
 
-Add-on **non officiel** qui fait tourner le **mode client** de [MyElectricalData v2](https://github.com/MyElectricalData/myelectricaldata_new) dans Home Assistant.
+Add-on **non officiel**, **uniquement pour architecture amd64** (pas de Raspberry Pi), qui fait tourner le **mode client** de [MyElectricalData new](https://github.com/MyElectricalData/myelectricaldata_new) dans Home Assistant.
 
 - Interface web MyElectricalData (consommation, production, Tempo, EcoWatt, offres)
 - Synchronisation automatique via la passerelle [www.v2.myelectricaldata.fr](https://www.v2.myelectricaldata.fr)
 - Base PostgreSQL intégrée, données incluses dans les sauvegardes Home Assistant
 - Export vers Home Assistant, MQTT, VictoriaMetrics ou Jeedom (configurable dans l'interface)
+- Accès en lecture seule à la base pour Grafana (optionnel), avec des [dashboards prêts à l'emploi](https://github.com/Marlboro62/myelectricaldata-v2-grafana)
 
 ## Informations
 
-- Architecture : amd64
+- Architecture : amd64 uniquement
 - Statut : expérimental, suit les versions publiées par le projet MyElectricalData
+- Numéro de version : par exemple `2.4.4.1` = version amont `2.4.4` de MyElectricalData, suivie d'une révision propre à l'add-on
 - Maintenu par Marlboro62, sans lien officiel avec l'équipe MyElectricalData
 
 ## Avant de commencer
@@ -26,4 +28,9 @@ Add-on **non officiel** qui fait tourner le **mode client** de [MyElectricalData
 3. Sur le **Tableau de bord** du site, cochez **Consommation** (et **Production** si vous produisez) sur la carte de votre PDL. L'add-on recopie ces options à chaque démarrage : sans elles, ses pages restent vides tant qu'on ne clique pas sur « Récupérer ».
 4. Saisissez le **Client ID** et le **Client Secret** dans l'onglet **Configuration** de l'add-on, puis démarrez-le.
 
-Voir l'onglet **Documentation** pour le détail.
+## Pour aller plus loin
+
+- **Grafana** : définissez `grafana_password` et ouvrez le port 5432 dans la section **Réseau** de l'add-on (réseau local uniquement, sans SSL). Détail dans l'onglet **Documentation**.
+- **Carte Lovelace** : [content-card-linky-v2](https://github.com/Marlboro62/content-card-linky-v2), qui s'appuie sur l'export Home Assistant.
+
+Voir l'onglet **Documentation** pour le détail de toutes les options.
