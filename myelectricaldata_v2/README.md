@@ -12,7 +12,7 @@ Add-on **non officiel**, **uniquement pour architecture amd64** (pas de Raspberr
 - Synchronisation automatique via la passerelle [www.v2.myelectricaldata.fr](https://www.v2.myelectricaldata.fr)
 - Base PostgreSQL intégrée, données incluses dans les sauvegardes Home Assistant
 - Export vers Home Assistant, MQTT, VictoriaMetrics ou Jeedom (configurable dans l'interface)
-- Accès en lecture seule à la base pour Grafana (optionnel), avec des [dashboards prêts à l'emploi](https://github.com/Marlboro62/myelectricaldata-v2-grafana)
+- Accès en lecture seule à la base pour Grafana (optionnel), avec des [dashboards prêts à l'emploi](https://github.com/Marlboro62/myelectricaldata-new-grafana)
 
 ## Informations
 
@@ -31,6 +31,6 @@ Add-on **non officiel**, **uniquement pour architecture amd64** (pas de Raspberr
 ## Pour aller plus loin
 
 - **Grafana** : définissez `grafana_password` et ouvrez le port 5432 dans la section **Réseau** de l'add-on (réseau local uniquement, sans SSL). Détail dans l'onglet **Documentation**.
-- **Carte Lovelace** : [content-card-linky-v2](https://github.com/Marlboro62/content-card-linky-v2), qui s'appuie sur l'export Home Assistant.
+- **Carte Lovelace** : [content-card-linky-new](https://github.com/Marlboro62/content-card-linky-new), qui s'appuie sur l'export Home Assistant.
 
 Voir l'onglet **Documentation** pour le détail de toutes les options.
