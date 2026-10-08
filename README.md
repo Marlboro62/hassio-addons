@@ -3,9 +3,20 @@
 Add-ons non officiels, maintenus par Marlboro62.
 
 | Add-on | Description |
-|---|---|
-| [MyElectricalData v2](myelectricaldata_v2) | Mode client de [MyElectricalData v2](https://github.com/MyElectricalData/myelectricaldata_new) : interface web, synchro Linky/Tempo, PostgreSQL intégré (expérimental). |
-| [MyElectricalData (v1)](enedisgateway2mqtt) | Version patchée de l'add-on MyElectricalData v1, issue du dépôt d'[alexbelgium](https://github.com/alexbelgium/hassio-addons). |
+| --- | --- |
+| [MyElectricalData v2](https://github.com/Marlboro62/hassio-addons/blob/master/myelectricaldata_v2) | Mode client de [MyElectricalData v2](https://github.com/MyElectricalData/myelectricaldata_new) : interface web, synchro Linky/Tempo, PostgreSQL intégré (expérimental). |
+| [MyElectricalData (v1)](https://github.com/Marlboro62/hassio-addons/blob/master/enedisgateway2mqtt) | Version patchée de l'add-on MyElectricalData v1, issue du dépôt d'[alexbelgium](https://github.com/alexbelgium/hassio-addons). |
+
+## 🧩 Fait partie de l'écosystème MyElectricalData v2
+
+Ces projets sont **non officiels**, maintenus par Marlboro62, sans lien avec l'équipe MyElectricalData. Ils s'appuient sur le [mode client de MyElectricalData v2](https://github.com/MyElectricalData/myelectricaldata_new).
+
+| Projet | Rôle |
+| --- | --- |
+| **Add-on Home Assistant (ce dépôt)** | Installe le mode client v2 dans Home Assistant (interface web, synchro Linky/Tempo, PostgreSQL intégré) |
+| [Script Proxmox (LXC)](https://github.com/Marlboro62/myelectricaldata-proxmox) | Déploie le mode client v2 dans un conteneur LXC Proxmox, sans Docker |
+| [Carte Lovelace](https://github.com/Marlboro62/content-card-linky-v2) | Affiche conso, Tempo, coût et puissance max dans un tableau de bord Home Assistant |
+| [Dashboards Grafana](https://github.com/Marlboro62/myelectricaldata-v2-grafana) | Analyse la base PostgreSQL de l'add-on (Linky, Tempo, coûts) |
 
 ## Installation
 
@@ -15,6 +26,10 @@ Dans Home Assistant : **Paramètres → Modules complémentaires → Boutique �
 - `https://github.com/Marlboro62/hassio-addons#test-myelectricaldata-v2` (branche de test).
 
 À l'origine, ce dépôt est un fork de [alexbelgium/hassio-addons](https://github.com/alexbelgium/hassio-addons), allégé pour ne garder que ces add-ons.
+
+## Quelle version installer ?
+
+Si vous ajoutez les deux dépôts, la boutique affiche deux sections : « Add-ons Marlboro62 » (version publiée) et « Marlboro62 – branche de test (MyElectricalData v2) ». Installez la v2 depuis **une seule** de ces sections, et évitez de faire tourner les deux en même temps. Avant de passer de la branche de test à la version publiée, faites une sauvegarde Home Assistant.
 
 ## Soutenir
 
