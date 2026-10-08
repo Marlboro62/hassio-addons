@@ -23,7 +23,7 @@ Ces projets sont **non officiels**, maintenus par Marlboro62, sans lien avec l'�
 Dans Home Assistant : **Paramètres → Modules complémentaires → Boutique → ⋮ → Dépôts**, puis ajouter :
 
 - `https://github.com/Marlboro62/hassio-addons` (version publiée) ;
-- `https://github.com/Marlboro62/hassio-addons#test-myelectricaldata-v2` (branche de test).
+- `https://github.com/Marlboro62/hassio-addons#test-myelectricaldata-new` (branche de test).
 
 À l'origine, ce dépôt est un fork de [alexbelgium/hassio-addons](https://github.com/alexbelgium/hassio-addons), allégé pour ne garder que ces add-ons.
 
