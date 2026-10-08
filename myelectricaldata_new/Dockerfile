@@ -1,6 +1,7 @@
 ARG MED_VERSION=2.4.4
-# --- Interface : code officiel de la version suivie + correctifs de l'add-on ---
-FROM node:20-alpine AS webbuild
+
+# --- Sources officielles de la version suivie (une seule fois, sur la machine de build) ---
+FROM --platform=$BUILDPLATFORM alpine:3.20 AS src
 ARG MED_VERSION
 RUN apk add --no-cache git
 WORKDIR /src
@@ -12,20 +13,38 @@ RUN set -e; for p in /patches/*.patch; do \
       elif git apply --reverse --check "$p" 2>/dev/null; then echo "Correctif déjà intégré en amont, ignoré : $p"; \
       else echo "ERREUR : le correctif $p ne s'applique plus sur la version ${MED_VERSION}"; exit 1; fi; \
     done
+
+# --- Interface web : fichiers statiques, identiques pour toutes les architectures ---
+FROM --platform=$BUILDPLATFORM node:20-alpine AS webbuild
+COPY --from=src /src/apps/web /src/apps/web
 WORKDIR /src/apps/web
 RUN npm ci --no-audit --no-fund && npm run build
 
-FROM ghcr.io/myelectricaldata/myelectricaldata_new/backend:${MED_VERSION}
-USER root
+# --- Backend : reconstruit depuis les sources (l'image officielle n'existe qu'en amd64) ---
+FROM python:3.12-slim-trixie AS deps
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev \
+ && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY --from=src /src/apps/api/pyproject.toml /src/apps/api/README.md ./
+RUN pip install --no-cache-dir .
+
+FROM python:3.12-slim-trixie
 ARG MED_VERSION
-ENV MED_VERSION=${MED_VERSION}
+ENV MED_VERSION=${MED_VERSION} TZ=Europe/Paris
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+COPY --from=deps /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=deps /usr/local/bin /usr/local/bin
+COPY --from=src /src/apps/api /app
+RUN rm -rf /app/tests && chmod +x /app/entrypoint.sh
 
 RUN mkdir -p /etc/postgresql-common \
  && echo "create_main_cluster = false" > /etc/postgresql-common/createcluster.conf \
  && apt-get update \
- && apt-get install -y --no-install-recommends nginx postgresql jq \
+ && apt-get install -y --no-install-recommends tzdata nginx postgresql jq \
  && rm -rf /var/lib/apt/lists/* \
- && rm -f /etc/nginx/sites-enabled/default
+ && rm -f /etc/nginx/sites-enabled/default \
+ && test -d /usr/lib/postgresql/17 || { echo "PostgreSQL 17 attendu (base de données existante)"; exit 1; }
 
 COPY --from=webbuild /src/apps/web/dist /var/www/med
 RUN printf 'window.__ENV__ = {\n  VITE_API_BASE_URL: "/api",\n  VITE_BACKEND_URL: "/api",\n  VITE_SERVER_MODE: "false",\n};\n' > /var/www/med/env.js \
