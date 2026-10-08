@@ -1,36 +1,84 @@
-Cet add-on est développé sur mon temps libre, par passion pour la domotique. S'il vous rend service, un café via l'un des boutons ci-dessous fait toujours plaisir ☕
+# Dashboards Grafana pour MyElectricalData New
 
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-d32f2f?logo=buymeacoffee&logoColor=white&style=flat)](https://buymeacoffee.com/marlboro62) [![Ko-fi](https://img.shields.io/badge/Ko--fi-ff5e5b?logo=kofi&logoColor=white&style=flat)](https://ko-fi.com/nothing_one)
 
-Vos retours sont tout aussi précieux : bugs, idées ou améliorations, n'hésitez pas à [ouvrir une issue](https://github.com/Marlboro62/hassio-addons/issues).
+Trois tableaux de bord Grafana qui lisent directement la base **PostgreSQL** de l'add-on Home Assistant [MyElectricalData new](https://github.com/Marlboro62/hassio-addons/tree/master/myelectricaldata_new) (consommation Linky journalière et à la demi-heure, couleurs Tempo, puissance max, grilles tarifaires).
 
-# MyElectricalData new
+## 🧩 Fait partie de l'écosystème MyElectricalData new
 
-Add-on **non officiel**, **uniquement pour architecture amd64** (pas de Raspberry Pi), qui fait tourner le **mode client** de [MyElectricalData new](https://github.com/MyElectricalData/myelectricaldata_new) dans Home Assistant.
+Ces projets sont **non officiels**, maintenus par Marlboro62, sans lien avec l'équipe MyElectricalData. Ils s'appuient sur le [mode client de MyElectricalData new](https://github.com/MyElectricalData/myelectricaldata_new), relié à la passerelle [www.v2.myelectricaldata.fr](https://www.v2.myelectricaldata.fr).
 
-- Interface web MyElectricalData (consommation, production, Tempo, EcoWatt, offres)
-- Synchronisation automatique via la passerelle [www.v2.myelectricaldata.fr](https://www.v2.myelectricaldata.fr)
-- Base PostgreSQL intégrée, données incluses dans les sauvegardes Home Assistant
-- Export vers Home Assistant, MQTT, VictoriaMetrics ou Jeedom (configurable dans l'interface)
-- Accès en lecture seule à la base pour Grafana (optionnel), avec des [dashboards prêts à l'emploi](https://github.com/Marlboro62/myelectricaldata-new-grafana)
+| Projet | Rôle |
+| --- | --- |
+| [Add-on Home Assistant](https://github.com/Marlboro62/hassio-addons) | Installe le mode client dans Home Assistant (interface web, synchro Linky/Tempo, PostgreSQL intégré) |
+| [Script Proxmox (LXC)](https://github.com/Marlboro62/myelectricaldata-proxmox) | Déploie le mode client dans un conteneur LXC Proxmox, sans Docker |
+| [Carte Lovelace](https://github.com/Marlboro62/content-card-linky-new) | Affiche conso, Tempo, coût et puissance max dans un tableau de bord Home Assistant |
+| **Dashboards Grafana (ce dépôt)** | Analyse la base PostgreSQL de l'add-on (Linky, Tempo, coûts) |
 
-## Informations
+## Contenu du dépôt
 
-- Architecture : amd64 uniquement
-- Statut : stable, suit les versions publiées par le projet MyElectricalData (les nouveautés sont d'abord testées dans l'add-on « MyElectricalData New Beta »)
-- Numéro de version : par exemple `2.4.4.1` = version amont `2.4.4` de MyElectricalData, suivie d'une révision propre à l'add-on
-- Maintenu par Marlboro62, sans lien officiel avec l'équipe MyElectricalData
+| Fichier | Contenu | Origine |
+| --- | --- | --- |
+| `dashboards/linky-tempo.json` | Tempo du jour et du lendemain, jours rouges/blancs restants, consommation par couleur, courbe de charge, puissance max, coût réel Tempo (année de facturation et période) | Création originale |
+| `dashboards/my-electrical-data-v2.json` | Consommation et coût HC/HP, classe énergétique, comparaison Tempo / offre Base, bilans annuels et mensuels | Adapté du dashboard de **geobar78** |
+| `dashboards/myelectricaldata-enedis-v2.json` | Consommation HC/HP, classe énergétique en énergie primaire, bilans sur 4 années, évolution à période égale | Adapté du dashboard de **HermesHonshappo** |
 
-## Avant de commencer
+## Remerciements
 
-1. Créez un compte sur [www.v2.myelectricaldata.fr](https://www.v2.myelectricaldata.fr) et donnez le consentement Enedis.
-2. Récupérez votre **Client ID** et votre **Client Secret** dans **Paramètres > API**.
-3. Sur le **Tableau de bord** du site, cochez **Consommation** (et **Production** si vous produisez) sur la carte de votre PDL. L'add-on recopie ces options à chaque démarrage : sans elles, ses pages restent vides tant qu'on ne clique pas sur « Récupérer ».
-4. Saisissez le **Client ID** et le **Client Secret** dans l'onglet **Configuration** de l'add-on, puis démarrez-le.
+Deux de ces dashboards sont des adaptations du travail d'autres membres de la communauté MyElectricalData.
+Merci à eux, sans qui ces tableaux de bord n'existeraient pas :
 
-## Pour aller plus loin
+- **geobar78** – [Myelectricaldata-Graphana-Dashboard](https://github.com/geobar78/Myelectricaldata-Graphana-Dashboard)
+  (version d'origine pour InfluxDB 1.x / InfluxQL)
+- **HermesHonshappo** – [MyElectricalData-dashboard](https://github.com/HermesHonshappo/MyElectricalData-dashboard)
+  (version d'origine pour InfluxDB 2 / Flux)
 
-- **Grafana** : définissez `grafana_password` et ouvrez le port 5432 dans la section **Réseau** de l'add-on (réseau local uniquement, sans SSL). Détail dans l'onglet **Documentation**.
-- **Carte Lovelace** : [content-card-linky-new](https://github.com/Marlboro62/content-card-linky-new), qui s'appuie sur l'export Home Assistant.
+La disposition, les styles et l'esprit des panneaux d'origine ont été conservés. Si vous utilisez encore
+MyElectricalData v1 avec InfluxDB, utilisez directement leurs dépôts.
 
-Voir l'onglet **Documentation** pour le détail de toutes les options.
+### Ce qui a été modifié dans les adaptations
+
+- Source de données : InfluxDB remplacé par le PostgreSQL de MyElectricalData new (requêtes SQL).
+- Prix : les tarifs saisis à la main sont remplacés par la table `energy_offers` de MyElectricalData,
+  avec le tarif en vigueur à chaque date et la couleur Tempo de chaque jour.
+- Plugins Angular retirés (`farski-blendstat-panel`, `blackmirror1-singlestat-math-panel`), incompatibles
+  avec Grafana 11 et suivants : remplacés par des panneaux `stat` natifs.
+- Années calculées automatiquement, évolutions comparées à période égale.
+- Températures Home Assistant retirées (elles venaient d'un bucket InfluxDB que MyElectricalData new ne fournit pas).
+
+## Prérequis
+
+1. L'add-on **MyElectricalData new** avec l'accès Grafana activé : définir `grafana_password` dans la
+   configuration de l'add-on, puis renseigner le port `5432` dans l'onglet **Réseau**.
+2. Grafana 11 ou plus récent.
+
+Testé avec l'add-on MyElectricalData new en version 2.4.4.2.
+
+> ⚠️ **Sécurité** : l'accès PostgreSQL est en lecture seule (utilisateur `grafana_ro`), mais la connexion n'est pas chiffrée (TLS désactivé). Gardez le port `5432` sur votre réseau local et ne le redirigez jamais depuis Internet.
+
+## Installation
+
+1. Dans Grafana : **Connections → Data sources → Add → PostgreSQL**
+   - Host : `IP_DE_HOME_ASSISTANT:5432`
+   - Database : `myelectricaldata_client`
+   - User : `grafana_ro` / mot de passe : celui de `grafana_password`
+   - TLS/SSL Mode : `disable`
+2. **Dashboards → New → Import**, choisir un fichier JSON, sélectionner la source PostgreSQL, **Import**.
+3. Ajuster les variables en haut du dashboard : puissance souscrite, surface du logement, début d'année de facturation…
+
+## Bon à savoir
+
+- Heures creuses : 22h-6h (Tempo). Un jour Tempo va de 6h à 6h.
+- Les coûts sont calculés à la demi-heure : ils ne sont disponibles que sur la période couverte par la courbe de charge Enedis.
+- Les coûts sont des estimations TTC à partir des grilles présentes dans MyElectricalData : si une ancienne grille manque,
+  la plus proche est appliquée.
+- Vous passez de l'ancien add-on « MyElectricalData v2 » à « MyElectricalData new » ? Il suffit de modifier la source
+  PostgreSQL de Grafana si le port ou l'adresse a changé : le nom de la base, l'utilisateur et les dashboards restent les mêmes.
+
+## Dépannage
+
+| Problème | Piste |
+| --- | --- |
+| Grafana n'arrive pas à se connecter à la base | Vérifiez que le port `5432` est renseigné dans l'onglet **Réseau** de l'add-on, puis que l'IP de Home Assistant est correcte |
+| Échec d'authentification | Le mot de passe de l'utilisateur `grafana_ro` est celui de `grafana_password` dans la configuration de l'add-on |
+| Panneaux vides ou coûts absents | Vérifiez que la synchronisation de l'add-on est terminée : les coûts n'existent que sur la période couverte par la courbe de charge |
