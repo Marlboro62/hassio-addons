@@ -6,7 +6,7 @@ Vos retours sont tout aussi précieux : bugs, idées ou améliorations, n'hésit
 
 # MyElectricalData new
 
-Add-on **non officiel**, **uniquement pour architecture amd64** (pas de Raspberry Pi), qui fait tourner le **mode client** de [MyElectricalData new](https://github.com/MyElectricalData/myelectricaldata_new) dans Home Assistant.
+Add-on **non officiel**, **pour amd64 et Raspberry Pi 4 ou 5** (aarch64, HAOS 64 bits), qui fait tourner le **mode client** de [MyElectricalData new](https://github.com/MyElectricalData/myelectricaldata_new) dans Home Assistant.
 
 - Interface web MyElectricalData (consommation, production, Tempo, EcoWatt, offres)
 - Synchronisation automatique via la passerelle [www.v2.myelectricaldata.fr](https://www.v2.myelectricaldata.fr)
@@ -16,7 +16,7 @@ Add-on **non officiel**, **uniquement pour architecture amd64** (pas de Raspberr
 
 ## Informations
 
-- Architecture : amd64 uniquement
+- Architecture : amd64 et aarch64 (Raspberry Pi 4 ou 5 avec HAOS 64 bits, 2 Go de RAM minimum). La version Raspberry est récente : vos retours sont les bienvenus
 - Statut : stable, suit les versions publiées par le projet MyElectricalData
 - Numéro de version : par exemple `2.4.4.2` = version amont `2.4.4` de MyElectricalData, suivie d'une révision propre à l'add-on
 - Version bêta : les nouveautés sont d'abord testées dans l'add-on « MyElectricalData New Beta ». Pour l'essayer, ajoutez le dépôt `https://github.com/Marlboro62/hassio-addons#test-myelectricaldata-new` (interface sur le port 8101, installable à côté de la version stable)
