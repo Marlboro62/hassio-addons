@@ -5,11 +5,6 @@
 - Passage en version stable : retrait du statut « Expérimental » et de la mention dans la description.
 - Aucun changement fonctionnel : image identique à la 2.4.4.1.
 
-## 2.4.4.2
-
-- Passage en version stable : retrait du statut « Expérimental » et de la mention dans la description.
-- Aucun changement fonctionnel : image identique à la 2.4.4.1.
-
 ## 2.4.4.1
 
 Version propre à l'add-on, toujours basée sur MyElectricalData 2.4.4 :
