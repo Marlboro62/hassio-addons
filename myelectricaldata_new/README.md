@@ -17,8 +17,9 @@ Add-on **non officiel**, **uniquement pour architecture amd64** (pas de Raspberr
 ## Informations
 
 - Architecture : amd64 uniquement
-- Statut : stable, suit les versions publiées par le projet MyElectricalData (les nouveautés sont d'abord testées dans l'add-on « MyElectricalData New Beta »)
-- Numéro de version : par exemple `2.4.4.1` = version amont `2.4.4` de MyElectricalData, suivie d'une révision propre à l'add-on
+- Statut : stable, suit les versions publiées par le projet MyElectricalData
+- Numéro de version : par exemple `2.4.4.2` = version amont `2.4.4` de MyElectricalData, suivie d'une révision propre à l'add-on
+- Version bêta : les nouveautés sont d'abord testées dans l'add-on « MyElectricalData New Beta ». Pour l'essayer, ajoutez le dépôt `https://github.com/Marlboro62/hassio-addons#test-myelectricaldata-new` (interface sur le port 8101, installable à côté de la version stable)
 - Maintenu par Marlboro62, sans lien officiel avec l'équipe MyElectricalData
 
 ## Avant de commencer
@@ -27,10 +28,17 @@ Add-on **non officiel**, **uniquement pour architecture amd64** (pas de Raspberr
 2. Récupérez votre **Client ID** et votre **Client Secret** dans **Paramètres > API**.
 3. Sur le **Tableau de bord** du site, cochez **Consommation** (et **Production** si vous produisez) sur la carte de votre PDL. L'add-on recopie ces options à chaque démarrage : sans elles, ses pages restent vides tant qu'on ne clique pas sur « Récupérer ».
 4. Saisissez le **Client ID** et le **Client Secret** dans l'onglet **Configuration** de l'add-on, puis démarrez-le.
+5. Dans l'interface de l'add-on, choisissez votre **offre** (fournisseur et tarif) sur la carte de votre PDL : sans elle, les coûts ne sont pas calculés.
+
+## Bon à savoir
+
+- **Désinstaller l'add-on efface sa base de données.** Faites une sauvegarde Home Assistant incluant l'add-on avant toute désinstallation.
+- **Quota de la passerelle** : 1000 requêtes par jour avec cache, 50 sans cache (remise à zéro à minuit UTC). L'add-on n'en consomme qu'une vingtaine par jour en temps normal ; évitez de faire tourner plusieurs instances sur le même compte.
+- **Vous venez de MyElectricalData v1 ?** L'option `import_v1` reprend l'historique de la v1 (`/homeassistant/myelectricaldata/cache.db`) au démarrage. Désactivez-la une fois l'import terminé.
 
 ## Pour aller plus loin
 
-- **Grafana** : définissez `grafana_password` et ouvrez le port 5432 dans la section **Réseau** de l'add-on (réseau local uniquement, sans SSL). Détail dans l'onglet **Documentation**.
+- **Grafana** : définissez `grafana_password` et renseignez le port 5432 dans la section **Réseau** de l'add-on (réseau local uniquement, sans SSL). Détail dans l'onglet **Documentation**.
 - **Carte Lovelace** : [content-card-linky-new](https://github.com/Marlboro62/content-card-linky-new), qui s'appuie sur l'export Home Assistant.
 
 Voir l'onglet **Documentation** pour le détail de toutes les options.
