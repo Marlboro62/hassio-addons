@@ -25,7 +25,7 @@ Dans l'interface web, onglet **Export > Home Assistant** :
 - URL : `http://homeassistant:8123`
 - Token : un jeton d'accès longue durée (Profil > Sécurité dans Home Assistant)
 
-Cet export alimente notamment la [carte Lovelace](https://github.com/Marlboro62/content-card-linky-v2).
+Cet export alimente notamment la [carte Lovelace](https://github.com/Marlboro62/content-card-linky-new).
 
 ## Accès Grafana (optionnel)
 
@@ -39,7 +39,7 @@ L'add-on peut ouvrir sa base PostgreSQL en **lecture seule** pour Grafana.
    - User : `grafana_ro`
    - Password : la valeur de `grafana_password`
    - TLS/SSL Mode : `disable`
-4. Importez les [dashboards prêts à l'emploi](https://github.com/Marlboro62/myelectricaldata-v2-grafana).
+4. Importez les [dashboards prêts à l'emploi](https://github.com/Marlboro62/myelectricaldata-new-grafana).
 
 ⚠️ La connexion PostgreSQL n'est **pas chiffrée** (pas de SSL). Comme pour le port 8100, n'exposez jamais le port 5432 sur Internet : réservez-le à votre réseau local, ou limitez-le à l'adresse de votre serveur Grafana avec votre pare-feu.
 
