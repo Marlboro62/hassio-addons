@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.4.4.3
+
+- Compatible Raspberry Pi 4 et 5 (aarch64, HAOS 64 bits) : le backend est désormais reconstruit depuis les sources officielles, l'image amont n'existant qu'en amd64.
+- Infobulle du badge de version : « Paramètres > Applications ».
+
 ## 2.4.4.2
 
 - Passage en version stable : retrait du statut « Expérimental » et de la mention dans la description.
