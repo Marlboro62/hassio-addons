@@ -34,6 +34,7 @@ Si vous ajoutez les deux dépôts, la boutique affiche deux sections : « Add-on
 | | MyElectricalData new | MyElectricalData New Beta |
 | --- | --- | --- |
 | Statut | Stable | Expérimental, pour tester les nouveautés |
+| Matériel | PC (amd64) | PC (amd64) et Raspberry Pi 4 ou 5 (aarch64, HAOS 64 bits, 2 Go de RAM minimum) |
 | Interface web | port 8100 | port 8101 |
 | Données | base propre à l'add-on | base séparée |
 
