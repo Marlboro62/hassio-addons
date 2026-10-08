@@ -4,7 +4,7 @@ Cet add-on est développé sur mon temps libre, par passion pour la domotique. S
 
 Vos retours sont tout aussi précieux : bugs, idées ou améliorations, n'hésitez pas à [ouvrir une issue](https://github.com/Marlboro62/hassio-addons/issues).
 
-# MyElectricalData new (expérimental)
+# MyElectricalData new
 
 Add-on **non officiel**, **uniquement pour architecture amd64** (pas de Raspberry Pi), qui fait tourner le **mode client** de [MyElectricalData new](https://github.com/MyElectricalData/myelectricaldata_new) dans Home Assistant.
 
@@ -17,7 +17,7 @@ Add-on **non officiel**, **uniquement pour architecture amd64** (pas de Raspberr
 ## Informations
 
 - Architecture : amd64 uniquement
-- Statut : expérimental, suit les versions publiées par le projet MyElectricalData
+- Statut : stable, suit les versions publiées par le projet MyElectricalData (les nouveautés sont d'abord testées dans l'add-on « MyElectricalData New Beta »)
 - Numéro de version : par exemple `2.4.4.1` = version amont `2.4.4` de MyElectricalData, suivie d'une révision propre à l'add-on
 - Maintenu par Marlboro62, sans lien officiel avec l'équipe MyElectricalData
 
