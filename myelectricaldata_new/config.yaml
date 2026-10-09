@@ -1,5 +1,5 @@
 name: "MyElectricalData New Beta"
-version: "2.4.4.3"
+version: "2.4.4.4"
 image: "marlboro62/{arch}-myelectricaldata-new-beta"
 slug: "myelectricaldata_new_beta"
 description: "Mode client MyElectricalData new : interface web, synchro Linky/Tempo et PostgreSQL intégrés"
@@ -23,6 +23,10 @@ ports_description:
   8100/tcp: "Interface web MyElectricalData (ne pas exposer sur Internet)"
   5432/tcp: "PostgreSQL lecture seule pour Grafana, sans SSL, réseau local uniquement (définir grafana_password, puis renseigner un port ici)"
 webui: "http://[HOST]:[PORT:8100]"
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:flash
+panel_title: MyElectricalData
 options:
   med_client_id: ""
   med_client_secret: ""

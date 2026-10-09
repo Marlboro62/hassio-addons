@@ -18,7 +18,7 @@ RUN set -e; for p in /patches/*.patch; do \
 FROM --platform=$BUILDPLATFORM node:20-alpine AS webbuild
 COPY --from=src /src/apps/web /src/apps/web
 WORKDIR /src/apps/web
-RUN npm ci --no-audit --no-fund && npm run build
+RUN npm ci --no-audit --no-fund && npm run build -- --base=/__MED_BASE__/
 
 # --- Backend : reconstruit depuis les sources (l'image officielle n'existe qu'en amd64) ---
 FROM python:3.12-slim-trixie AS deps

@@ -109,7 +109,7 @@ case "$PERIODE" in
 esac
 JOUR=$(( 10#${DEBUT%%/*} )); MOIS=$(( 10#${DEBUT##*/} ))
 {
-  printf 'window.__ENV__ = {\n  VITE_API_BASE_URL: "/api",\n  VITE_BACKEND_URL: "/api",\n  VITE_SERVER_MODE: "false",\n  VITE_DEFAULT_MQTT_BROKER: "core-mosquitto",\n  VITE_DEFAULT_MQTT_PORT: "1883",\n  VITE_DEFAULT_TOPIC_PREFIX: "myelectricaldata",\n  VITE_DEFAULT_ENTITY_PREFIX: "myelectricaldata",\n  VITE_DEFAULT_DISCOVERY_PREFIX: "homeassistant",\n  VITE_DEFAULT_HA_URL: "http://homeassistant:8123",\n  VITE_DEFAULT_VM_URL: "",\n};\n'
+  printf 'window.__ENV__ = {\n  VITE_API_BASE_URL: "/api",\n  VITE_BACKEND_URL: "/api",\n  VITE_SERVER_MODE: "false",\n  VITE_BASE_PATH: "",\n  VITE_DEFAULT_MQTT_BROKER: "core-mosquitto",\n  VITE_DEFAULT_MQTT_PORT: "1883",\n  VITE_DEFAULT_TOPIC_PREFIX: "myelectricaldata",\n  VITE_DEFAULT_ENTITY_PREFIX: "myelectricaldata",\n  VITE_DEFAULT_DISCOVERY_PREFIX: "homeassistant",\n  VITE_DEFAULT_HA_URL: "http://homeassistant:8123",\n  VITE_DEFAULT_VM_URL: "",\n};\n'
   if [ -n "$PRESET" ]; then
     printf '(function(){var k="date-preferences-storage",m="med-addon-periode",v="%s-%d-%d",s=JSON.stringify({state:{preset:"%s",customDate:{day:%d,month:%d}},version:0});function a(){try{if(localStorage.getItem(m)!==v||!localStorage.getItem(k)){localStorage.setItem(k,s);localStorage.setItem(m,v);return true}}catch(e){}return false}a();window.addEventListener("load",function(){[1000,3000].forEach(function(t){setTimeout(function(){try{if(a()&&!sessionStorage.getItem("med-addon-reload")){sessionStorage.setItem("med-addon-reload","1");location.reload()}}catch(e){}},t)})})})();\n' "$PRESET" "$JOUR" "$MOIS" "$PRESET" "$JOUR" "$MOIS"
   fi

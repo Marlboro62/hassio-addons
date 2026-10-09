@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.4.4.4
+
+- Interface accessible dans Home Assistant (Ingress) : bouton « Afficher dans la barre latérale », accès à distance en https sans ouvrir le port 8100.
+- L'accès direct par le port 8100 reste disponible.
+
 ## 2.4.4.3
 
 - Compatible Raspberry Pi 4 et 5 (aarch64, HAOS 64 bits) : le backend est désormais reconstruit depuis les sources officielles, l'image amont n'existant qu'en amd64.
