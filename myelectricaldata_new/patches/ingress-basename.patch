@@ -1,0 +1,12 @@
+diff --git a/apps/web/src/main.tsx b/apps/web/src/main.tsx
+index 5df107c..e5ae05e 100644
+--- a/apps/web/src/main.tsx
++++ b/apps/web/src/main.tsx
+@@ -79,6 +79,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
+       }}
+     >
+       <BrowserRouter
++        basename={(window as unknown as { __ENV__?: { VITE_BASE_PATH?: string } }).__ENV__?.VITE_BASE_PATH || undefined}
+         future={{
+           v7_startTransition: true,
+           v7_relativeSplatPath: true
