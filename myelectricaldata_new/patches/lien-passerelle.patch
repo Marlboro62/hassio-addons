@@ -14,10 +14,10 @@ index 0f3e80e..51b46e8 100644
 +                target="_blank"
 +                rel="noopener noreferrer"
 +                className="flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
-+                title={sidebarCollapsed ? 'Site MyElectricalData' : ''}
++                title={sidebarCollapsed ? 'Passerelle' : ''}
 +              >
 +                <ExternalLink size={20} className="flex-shrink-0" />
-+                {!sidebarCollapsed && <span className="font-medium">Site MyElectricalData</span>}
++                {!sidebarCollapsed && <span className="font-medium">Passerelle</span>}
 +              </a>
 +            )}
            </div>
@@ -38,7 +38,7 @@ index 0f3e80e..51b46e8 100644
 +                onClick={() => setMobileMenuOpen(false)}
 +              >
 +                <ExternalLink size={20} />
-+                <span className="font-medium">Site MyElectricalData</span>
++                <span className="font-medium">Passerelle</span>
 +              </a>
 +            )}
            </div>

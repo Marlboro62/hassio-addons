@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.4.4.6
+
+- Lien du menu renommé « Passerelle » (tient sur une ligne dans la barre latérale de Home Assistant).
+
 ## 2.4.4.5
 
 - Menu de l'interface : lien « Site MyElectricalData » vers la passerelle (simulateur, contributions de prix, compte, quotas).
