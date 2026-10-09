@@ -11,7 +11,7 @@ Add-on **non officiel**, **pour amd64 et Raspberry Pi 4 ou 5** (aarch64, HAOS 64
 - Interface web MyElectricalData (consommation, production, Tempo, EcoWatt, offres)
 - Synchronisation automatique via la passerelle [www.v2.myelectricaldata.fr](https://www.v2.myelectricaldata.fr)
 - Base PostgreSQL intégrée, données incluses dans les sauvegardes Home Assistant
-- Export vers Home Assistant, MQTT, VictoriaMetrics ou Jeedom (configurable dans l'interface)
+- Export vers Home Assistant, MQTT (lisible par Jeedom, Domoticz, Node-RED…) ou VictoriaMetrics (configurable dans l'interface)
 - Accès en lecture seule à la base pour Grafana (optionnel), avec des [dashboards prêts à l'emploi](https://github.com/Marlboro62/myelectricaldata-new-grafana)
 
 ## Informations
