@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.4.4.5
+
+- Menu de l'interface : lien « Site MyElectricalData » vers la passerelle (simulateur, contributions de prix, compte, quotas).
+
 ## 2.4.4.4
 
 - Interface accessible dans Home Assistant (Ingress) : bouton « Afficher dans la barre latérale », accès à distance en https sans ouvrir le port 8100.

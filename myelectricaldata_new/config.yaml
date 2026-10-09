@@ -1,5 +1,5 @@
 name: "MyElectricalData New Beta"
-version: "2.4.4.4"
+version: "2.4.4.5"
 image: "marlboro62/{arch}-myelectricaldata-new-beta"
 slug: "myelectricaldata_new_beta"
 description: "Mode client MyElectricalData new : interface web, synchro Linky/Tempo et PostgreSQL intégrés"
