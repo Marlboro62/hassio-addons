@@ -9,9 +9,11 @@ Vos retours sont tout aussi précieux : bugs, idées ou améliorations, n'hésit
 Add-on **non officiel**, **pour amd64 et Raspberry Pi 4 ou 5** (aarch64, HAOS 64 bits), qui fait tourner le **mode client** de [MyElectricalData new](https://github.com/MyElectricalData/myelectricaldata_new) dans Home Assistant.
 
 - Interface web MyElectricalData (consommation, production, Tempo, EcoWatt, offres)
+- Accessible depuis la barre latérale de Home Assistant (option « Afficher dans la barre latérale » de l'onglet Infos), y compris à distance, sans ouvrir le port 8100
+- Lien « Passerelle » dans le menu, vers votre compte sur www.v2.myelectricaldata.fr (quotas, simulateur, contributions de prix)
 - Synchronisation automatique via la passerelle [www.v2.myelectricaldata.fr](https://www.v2.myelectricaldata.fr)
 - Base PostgreSQL intégrée, données incluses dans les sauvegardes Home Assistant
-- Export vers Home Assistant, MQTT (lisible par Jeedom, Domoticz, Node-RED…) ou VictoriaMetrics (configurable dans l'interface)
+- Export vers Home Assistant (capteurs MQTT et tableau de bord Énergie) ou VictoriaMetrics, configurable dans l'interface
 - Accès en lecture seule à la base pour Grafana (optionnel), avec des [dashboards prêts à l'emploi](https://github.com/Marlboro62/myelectricaldata-new-grafana)
 
 ## Informations
