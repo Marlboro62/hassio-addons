@@ -123,26 +123,38 @@ log "Période d'analyse : ${PERIODE}$( [ "$PRESET" = custom ] && echo " (à part
 addon_version() {
   [ -n "${SUPERVISOR_TOKEN:-}" ] || return 0
   python3 - <<'PY' || true
-import json, os, urllib.request
-req = urllib.request.Request("http://supervisor/addons/self/info",
-                             headers={"Authorization": "Bearer " + os.environ["SUPERVISOR_TOKEN"]})
+import json, os, re, urllib.request
+def sv(path):
+    req = urllib.request.Request("http://supervisor" + path,
+                                 headers={"Authorization": "Bearer " + os.environ["SUPERVISOR_TOKEN"]})
+    return urllib.request.urlopen(req, timeout=10).read().decode("utf-8", "replace")
+def vt(v):
+    return tuple(int(x) for x in v.split("."))
 try:
-    d = json.load(urllib.request.urlopen(req, timeout=10))["data"]
+    d = json.loads(sv("/addons/self/info"))["data"]
 except Exception:
     raise SystemExit(0)
+cur, latest = d.get("version") or "", d.get("version_latest") or ""
 behind = 0
 if d.get("update_available"):
     behind = 1
     try:
-        req = urllib.request.Request("http://supervisor/addons/self/changelog",
-                                     headers={"Authorization": "Bearer " + os.environ["SUPERVISOR_TOKEN"]})
-        txt = urllib.request.urlopen(req, timeout=10).read().decode("utf-8", "replace")
-        vers = [l[3:].split()[0] for l in txt.splitlines() if l.startswith("## ") and l[3:].strip()]
-        if d.get("version") in vers:
-            behind = max(1, vers.index(d.get("version")))
+        # Versions réellement publiées pour cette image (canal + architecture) sur Docker Hub
+        url = "https://hub.docker.com/v2/repositories/%s/tags?page_size=100" % d["image"]
+        tags = [t["name"] for t in json.load(urllib.request.urlopen(url, timeout=15))["results"]]
+        pub = [t for t in tags if re.fullmatch(r"\d+(\.\d+)*", t) and vt(cur) < vt(t) <= vt(latest)]
+        if pub:
+            behind = len(pub)
+        else:
+            raise ValueError
     except Exception:
-        pass
-out = {"version": d.get("version"), "latest": d.get("version_latest"),
+        try:
+            vers = [l[3:].split()[0] for l in sv("/addons/self/changelog").splitlines() if l.startswith("## ") and l[3:].strip()]
+            if cur in vers:
+                behind = max(1, vers.index(cur))
+        except Exception:
+            pass
+out = {"version": cur, "latest": latest,
        "update": bool(d.get("update_available")), "behind": behind,
        "upstream": os.environ.get("MED_VERSION", "")}
 tmp = "/var/www/med/addon-version.json.tmp"
