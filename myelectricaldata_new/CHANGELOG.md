@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.4.4.8
+
+- Retard de version : seules les versions réellement publiées pour ce canal (stable ou bêta) sont comptées, au lieu de toutes les entrées du journal.
+
 ## 2.4.4.7
 
 - Version de l'add-on affichée en bas à gauche du menu, sous « Préférences » : verte si à jour, orange avec 1 version de retard, rouge à partir de 2 versions de retard (survol : comment mettre à jour, clic : journal des modifications).
