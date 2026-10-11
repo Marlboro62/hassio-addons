@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.4.4.9
+
+- Version de l'add-on vérifiée toutes les 15 minutes au lieu d'une heure : la ligne passe en orange plus vite quand une mise à jour est publiée.
+
 ## 2.4.4.8
 
 - Retard de version : seules les versions réellement publiées pour ce canal (stable ou bêta) sont comptées, au lieu de toutes les entrées du journal.
