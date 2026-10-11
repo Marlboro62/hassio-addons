@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.4.4.7
+
+- Version de l'add-on affichée en bas à gauche du menu, sous « Préférences » : verte si à jour, orange avec 1 version de retard, rouge à partir de 2 versions de retard (survol : comment mettre à jour, clic : journal des modifications).
+
 ## 2.4.4.6
 
 - Lien du menu renommé « Passerelle » (tient sur une ligne dans la barre latérale de Home Assistant).
