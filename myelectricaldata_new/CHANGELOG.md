@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.4.4.11
+
+- Export MQTT : il se lance aussi depuis le planificateur (PR amont #119, issue #134).
+- Bouton « Exécuter » des exports (et import des statistiques HA) : corrige « Connexion perdue » via la barre latérale de HA.
+
 ## 2.4.4.9
 
 - Version de l'add-on vérifiée toutes les 15 minutes au lieu d'une heure : la ligne passe en orange plus vite quand une mise à jour est publiée.
