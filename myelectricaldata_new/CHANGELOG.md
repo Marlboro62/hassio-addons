@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.5.3
+
+- Basé sur MyElectricalData 2.5.3 : import des statistiques compatible Home Assistant 2025.11 et suivants (mean_type, unit_class), export MQTT planifié complété (Zen Flex).
+
 ## 2.5.1
 
 - Basé sur MyElectricalData 2.5.1 : cache de la passerelle activé par défaut, calculs corrects pour les courbes au pas de 15 ou 30 min.
