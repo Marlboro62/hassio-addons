@@ -1,4 +1,4 @@
-ARG MED_VERSION=2.5.1
+ARG MED_VERSION=2.5.3
 
 # --- Sources officielles de la version suivie (une seule fois, sur la machine de build) ---
 FROM --platform=$BUILDPLATFORM alpine:3.20 AS src
