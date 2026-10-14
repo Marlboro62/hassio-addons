@@ -1,0 +1,62 @@
+# Publie la démo de l'interface MyElectricalData new sur GitHub Pages :
+# https://marlboro62.github.io/hassio-addons/demo/
+# L'interface est reprise telle quelle de l'image Docker de l'add-on stable,
+# puis la couche de simulation (dossier demo/) y est ajoutée.
+name: Démo de l'interface
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - myelectricaldata_new/config.yaml
+      - demo/**
+      - .github/workflows/demo.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extraire l'interface de l'image de l'add-on
+        run: |
+          VERSION=$(sed -n 's/^version: "\(.*\)"/\1/p' myelectricaldata_new/config.yaml)
+          echo "Version de l'add-on : $VERSION"
+          # L'image peut arriver sur Docker Hub quelques minutes après le commit
+          for i in 1 2 3 4 5 6; do
+            docker pull -q "marlboro62/amd64-myelectricaldata-new:$VERSION" && break
+            echo "Image pas encore disponible, nouvel essai dans 60 s"; sleep 60
+          done
+          id=$(docker create "marlboro62/amd64-myelectricaldata-new:$VERSION")
+          docker cp "$id:/var/www/med" web
+          docker rm "$id"
+
+      - name: Construire la démo
+        run: |
+          python3 demo/build.py web site/demo /hassio-addons/demo demo
+          printf '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=demo/"><a href="demo/">Démo MyElectricalData new</a>\n' > site/index.html
+          touch site/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}demo/
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
