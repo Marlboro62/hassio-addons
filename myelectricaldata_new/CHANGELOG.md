@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.5.1
+
+- Basé sur MyElectricalData 2.5.1 : cache de la passerelle activé par défaut, calculs corrects pour les courbes au pas de 15 ou 30 min.
+- Export MQTT planifié désormais corrigé en amont : le correctif propre à l'add-on est retiré.
+- Conservé : correctif du bouton « Exécuter » via la barre latérale (en attente de la PR amont #146).
+
 ## 2.4.4.11
 
 - Bouton « Exécuter » des exports (et import des statistiques HA) : corrige « Connexion perdue » via la barre latérale de HA.
