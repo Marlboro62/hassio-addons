@@ -69,8 +69,14 @@ jobs:
 
       - name: Vérifier avec Home Assistant
         run: |
-          hass --script check_config -c cfg --info automation | tee check.log
+          hass --script check_config -c cfg --info automation 2>&1 | tee check.log
+          { echo '### check_config'; echo '```'; cat check.log; echo '```'; } >>"$GITHUB_STEP_SUMMARY"
           if grep -qiE "invalid|error|failed" check.log; then
             echo "::error::Home Assistant signale une erreur dans un blueprint"
             exit 1
           fi
+          # Les deux automatisations doivent avoir été réellement chargées depuis le blueprint
+          for alias in "Tempo, réglages par défaut" "Tempo, toutes les options"; do
+            grep -qF "$alias" check.log || { echo "::error::Automatisation « $alias » absente du résultat"; exit 1; }
+          done
+          grep -qF "notify.mobile_app_telephone" check.log || { echo "::error::Entrées du blueprint non appliquées"; exit 1; }
