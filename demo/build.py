@@ -28,7 +28,6 @@ SUBS = [
     ('VITE_BASE_PATH: ""', f'VITE_BASE_PATH: "{base}"'),
     ('"/api"', f'"{base}/api"'),
     ('"/api/', f'"{base}/api/'),
-    ("`/api/", f"`{base}/api/"),
     ("/__MED_BASE__/", f"{base}/"),
     ('"/env.js"', f'"{base}/env.js"'),
     ('"/favicon', f'"{base}/favicon'),
