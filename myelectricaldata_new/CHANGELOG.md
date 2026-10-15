@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.5.6
+
+- Basé sur MyElectricalData 2.5.6 : [notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.5.6).
+
 ## 2.5.5
 
 - Basé sur MyElectricalData 2.5.5 : gestion du HTTP 429 pendant la synchro, pas par relevé dans tous les calculs (kWh, Euro, exports, comparaisons).
