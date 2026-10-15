@@ -1,0 +1,76 @@
+# Valide les blueprints avec Home Assistant lui-même (hass --script check_config) :
+# chaque blueprint est instancié dans une configuration de test, comme le ferait un utilisateur.
+name: Blueprints
+
+on:
+  push:
+    paths:
+      - blueprints/**
+      - .github/workflows/blueprints.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Installer Home Assistant
+        run: pip install --quiet homeassistant
+
+      - name: Configuration de test
+        run: |
+          mkdir -p cfg/blueprints
+          cp -r blueprints/automation cfg/blueprints/
+          cat >cfg/configuration.yaml <<'EOF'
+          homeassistant:
+            name: Test
+            latitude: 48.85
+            longitude: 2.35
+            elevation: 35
+            unit_system: metric
+            time_zone: Europe/Paris
+            country: FR
+          automation: !include automations.yaml
+          EOF
+          cat >cfg/automations.yaml <<'EOF'
+          - id: tempo_defaut
+            alias: Tempo, réglages par défaut
+            use_blueprint:
+              path: marlboro62/tempo_jours_rouges.yaml
+              input: {}
+          - id: tempo_complet
+            alias: Tempo, toutes les options
+            use_blueprint:
+              path: marlboro62/tempo_jours_rouges.yaml
+              input:
+                colors: [RED, WHITE]
+                notify_action: notify.mobile_app_telephone
+                notify_on_announce: true
+                evening_reminder: false
+                reminder_time: "19:30:00"
+                tempo_info: sensor.edf_tempo_info
+                start_actions:
+                  - action: switch.turn_off
+                    target:
+                      entity_id: switch.chauffe_eau
+                end_actions:
+                  - action: switch.turn_on
+                    target:
+                      entity_id: switch.chauffe_eau
+          EOF
+
+      - name: Vérifier avec Home Assistant
+        run: |
+          hass --script check_config -c cfg --info automation | tee check.log
+          if grep -qiE "invalid|error|failed" check.log; then
+            echo "::error::Home Assistant signale une erreur dans un blueprint"
+            exit 1
+          fi

@@ -1,0 +1,195 @@
+blueprint:
+  name: "Tempo : alerte et actions les jours rouges (MyElectricalData new)"
+  description: >-
+    Prévient quand RTE annonce un jour **rouge** (ou blanc) Tempo pour le lendemain, avec le
+    nombre de jours restants, et lance vos actions au début et à la fin des heures pleines de ces
+    jours-là (couper un chauffe-eau, passer des radiateurs en éco, etc.).
+
+
+    Utilise les capteurs créés par l'export Home Assistant de
+    [MyElectricalData new](https://github.com/MyElectricalData/myelectricaldata_new) (mode client) :
+    `sensor.rte_tempo_today`, `sensor.rte_tempo_tomorrow` et `sensor.edf_tempo_tempo_info`.
+
+
+    Blueprint non officiel :
+    [documentation](https://github.com/Marlboro62/hassio-addons/tree/master/blueprints).
+  domain: automation
+  author: Marlboro62
+  homeassistant:
+    min_version: "2024.10.0"
+  source_url: https://github.com/Marlboro62/hassio-addons/blob/master/blueprints/automation/marlboro62/tempo_jours_rouges.yaml
+  input:
+    capteurs:
+      name: Capteurs Tempo
+      icon: mdi:calendar
+      collapsed: true
+      input:
+        tempo_today:
+          name: Couleur Tempo du jour
+          default: sensor.rte_tempo_today
+          selector:
+            entity:
+              domain: sensor
+        tempo_tomorrow:
+          name: Couleur Tempo du lendemain
+          default: sensor.rte_tempo_tomorrow
+          selector:
+            entity:
+              domain: sensor
+        tempo_info:
+          name: Jours Tempo restants
+          description: >-
+            Capteur des jours restants (selon l'installation, sensor.edf_tempo_tempo_info ou
+            sensor.edf_tempo_info).
+          default: sensor.edf_tempo_tempo_info
+          selector:
+            entity:
+              domain: sensor
+    regles:
+      name: Couleurs concernées
+      icon: mdi:palette
+      input:
+        colors:
+          name: Couleurs
+          description: Jours qui déclenchent les notifications et les actions.
+          default: [RED]
+          selector:
+            select:
+              multiple: true
+              options:
+                - label: Rouge
+                  value: RED
+                - label: Blanc
+                  value: WHITE
+    notification:
+      name: Notification
+      icon: mdi:bell-ring
+      input:
+        notify_action:
+          name: Action de notification
+          description: >-
+            Action notify à appeler, par exemple notify.mobile_app_mon_telephone (voir
+            Outils de développement → Actions, en tapant « notify »). Laissez vide pour ne pas
+            envoyer de notification.
+          default: ""
+          selector:
+            text:
+        notify_on_announce:
+          name: Prévenir dès l'annonce
+          description: Notification dès que la couleur du lendemain est publiée (en général vers midi).
+          default: true
+          selector:
+            boolean:
+        evening_reminder:
+          name: Rappel le soir
+          description: Notification de rappel la veille, à l'heure choisie ci-dessous.
+          default: true
+          selector:
+            boolean:
+        reminder_time:
+          name: Heure du rappel
+          default: "20:00:00"
+          selector:
+            time:
+    actions:
+      name: Actions pendant les jours concernés
+      icon: mdi:radiator
+      input:
+        start_time:
+          name: Début
+          description: Début des heures pleines Tempo (6 h).
+          default: "06:00:00"
+          selector:
+            time:
+        start_actions:
+          name: Actions au début
+          description: Par exemple couper le chauffe-eau, passer les radiateurs en éco.
+          default: []
+          selector:
+            action:
+        end_time:
+          name: Fin
+          description: Début des heures creuses (22 h).
+          default: "22:00:00"
+          selector:
+            time:
+        end_actions:
+          name: Actions à la fin
+          description: Par exemple remettre le chauffe-eau et les radiateurs en confort.
+          default: []
+          selector:
+            action:
+
+mode: queued
+max: 5
+
+triggers:
+  - trigger: state
+    id: annonce
+    entity_id: !input tempo_tomorrow
+    not_to: [unavailable, unknown]
+  - trigger: time
+    id: rappel
+    at: !input reminder_time
+  - trigger: time
+    id: debut
+    at: !input start_time
+  - trigger: time
+    id: fin
+    at: !input end_time
+
+variables:
+  colors: !input colors
+  notify_action: !input notify_action
+  notify_on_announce: !input notify_on_announce
+  evening_reminder: !input evening_reminder
+  today_entity: !input tempo_today
+  tomorrow_entity: !input tempo_tomorrow
+  info_entity: !input tempo_info
+  today: "{{ states(today_entity) | upper }}"
+  tomorrow: "{{ states(tomorrow_entity) | upper }}"
+  noms: {"RED": "rouge", "WHITE": "blanc", "BLUE": "bleu"}
+  pastilles: {"RED": "🔴", "WHITE": "⚪", "BLUE": "🔵"}
+  titre: "{{ pastilles.get(tomorrow, '') }} Tempo : demain jour {{ noms.get(tomorrow, tomorrow | lower) }}"
+  message: >-
+    {%- set jours = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'] -%}
+    {%- set mois = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août',
+                    'septembre', 'octobre', 'novembre', 'décembre'] -%}
+    {%- set d = now() + timedelta(days=1) -%}
+    {%- set nom = noms.get(tomorrow, tomorrow | lower) -%}
+    {%- set info = state_attr(info_entity, 'days_' ~ (tomorrow | lower) ~ '_detail') -%}
+    {%- set reste = info.remaining if info is mapping and info.remaining is number else none -%}
+    Demain, {{ jours[d.weekday()] }} {{ d.day }} {{ mois[d.month - 1] }}, est un jour {{ nom | upper }}
+    (heures pleines de 6 h à 22 h).
+    {%- if reste is not none %} Il restera {{ reste }} jour{{ 's' if reste != 1 }} {{ nom }}{{ 's' if reste != 1 }}
+    {%- if info.quota is number %} sur {{ info.quota }}{% endif %} cette saison.{% endif %}
+
+actions:
+  - choose:
+      # Couleur du lendemain annoncée, ou rappel du soir
+      - conditions:
+          - condition: template
+            value_template: >-
+              {{ tomorrow in colors and notify_action | trim != '' and
+                 ((trigger.id == 'annonce' and notify_on_announce
+                   and (trigger.from_state.state | upper) != tomorrow)
+                  or (trigger.id == 'rappel' and evening_reminder)) }}
+        sequence:
+          - action: "{{ notify_action | trim }}"
+            data:
+              title: "{{ titre }}"
+              message: "{{ ('Rappel : ' if trigger.id == 'rappel' else '') ~ message }}"
+      # Début des heures pleines d'un jour concerné
+      - conditions:
+          - condition: trigger
+            id: debut
+          - condition: template
+            value_template: "{{ today in colors }}"
+        sequence: !input start_actions
+      # Fin des heures pleines d'un jour concerné
+      - conditions:
+          - condition: trigger
+            id: fin
+          - condition: template
+            value_template: "{{ today in colors }}"
+        sequence: !input end_actions
