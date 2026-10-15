@@ -53,7 +53,7 @@ jobs:
       med: ${{ steps.v.outputs.med }}
       addon: ${{ steps.v.outputs.addon }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ env.BRANCH }}
 
@@ -104,7 +104,7 @@ jobs:
       MED: ${{ needs.check.outputs.med }}
       ADDON: ${{ needs.check.outputs.addon }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ env.BRANCH }}
 
@@ -145,7 +145,7 @@ jobs:
       ADDON: ${{ needs.check.outputs.addon }}
       LINE: ${{ inputs.changelog }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ env.BRANCH }}
 
