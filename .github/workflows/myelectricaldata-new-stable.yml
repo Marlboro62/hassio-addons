@@ -90,7 +90,11 @@ jobs:
           git checkout "origin/$BETA_BRANCH" -- "$ADDON_DIR"
           git checkout HEAD -- "$ADDON_DIR/config.yaml" "$ADDON_DIR/README.md"
           sed -i "s/^version: .*/version: \"$VERSION\"/" "$ADDON_DIR/config.yaml"
+          # sed ne modifie que la copie de travail : tout ajouter à l'index avant le commit
+          git add -A "$ADDON_DIR"
           git status --short
+          grep -q "^version: \"$VERSION\"" "$ADDON_DIR/config.yaml"
+          git diff --cached --quiet -- "$ADDON_DIR/config.yaml" && { echo "::error::config.yaml n'a pas été mis à jour"; exit 1; }
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
