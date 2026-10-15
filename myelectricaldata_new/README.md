@@ -38,7 +38,7 @@ Add-on **non officiel**, **pour amd64 et Raspberry Pi 4 ou 5** (aarch64, HAOS 64
 
 - **Désinstaller l'add-on efface sa base de données.** Faites une sauvegarde Home Assistant incluant l'add-on avant toute désinstallation.
 - **Quota de la passerelle** : 1000 requêtes par jour avec cache, 50 sans cache (remise à zéro à minuit UTC). L'add-on n'en consomme qu'une vingtaine par jour en temps normal ; évitez de faire tourner plusieurs instances sur le même compte.
-- **Vous venez de MyElectricalData v1 ?** L'option `import_v1` reprend l'historique de la v1 (`/homeassistant/myelectricaldata/cache.db`) au démarrage. Désactivez-la une fois l'import terminé.
+- **Vous venez de MyElectricalData v1 ?** L'option `import_v1` reprend l'historique de la v1 (consommation, production, puissance max) avec l'outil officiel, après une simulation possible (`import_v1_dry_run`). Voir l'onglet Documentation.
 
 ## Pour aller plus loin
 

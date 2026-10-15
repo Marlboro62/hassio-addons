@@ -33,6 +33,7 @@ options:
   debug: false
   import_v1: false
   import_v1_path: "/homeassistant/myelectricaldata/cache.db"
+  import_v1_dry_run: false
   periode_analyse: "defaut"
   periode_debut: "1/9"
   grafana_password: ""
@@ -43,6 +44,7 @@ schema:
   debug: bool
   import_v1: bool
   import_v1_path: str
+  import_v1_dry_run: bool
   periode_analyse: list(defaut|tempo|glissante|calendaire|personnalisee)
   periode_debut: match(^(0?[1-9]|[12][0-9]|3[01])/(0?[1-9]|1[0-2])$)
   grafana_password: password?
