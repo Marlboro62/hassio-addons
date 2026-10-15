@@ -72,7 +72,7 @@ jobs:
           hass --script check_config -c cfg --info automation 2>&1 | tee check.log
           { echo '### check_config'; echo '```'; cat check.log; echo '```'; } >>"$GITHUB_STEP_SUMMARY"
           if grep -qiE "invalid|error|failed" check.log; then
-            echo "::error::Home Assistant signale une erreur dans un blueprint"
+            grep -iE -A3 "invalid|error|failed" check.log | head -40 | while IFS= read -r l; do echo "::error::$l"; done
             exit 1
           fi
           # Les deux automatisations doivent avoir été réellement chargées depuis le blueprint
