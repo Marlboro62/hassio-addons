@@ -1,64 +1,118 @@
 #!/bin/bash
-# Import de l'historique de consommation de l'add-on MyElectricalData v1 (cache.db SQLite)
-# dans la base PostgreSQL de la version new. N'écrase jamais une donnée existante.
-set -euo pipefail
+# Import de l'historique de l'add-on MyElectricalData v1 (cache.db) avec l'outil officiel
+# scripts/import_v1.py (MyElectricalData 2.7.0 et suivantes).
+#
+# Lancé en arrière-plan par run.sh une fois le backend démarré : l'outil n'importe que les PDL
+# déjà connus de la version new, il faut donc attendre que le backend les ait récupérés.
+# Aucune donnée existante n'est écrasée ; l'import peut être relancé sans risque.
+#
+# Utilisation : import_v1.sh <cache.db> <true|false : simulation>
+# Variables attendues : PG_BIN, DB_NAME, DATABASE_URL (exportées par run.sh)
+set -uo pipefail
 
 SRC="${1:?chemin de cache.db manquant}"
-log() { echo "[import-v1] $*"; }
+DRY_RUN="${2:-false}"
+WAIT_MAX="${IMPORT_V1_WAIT_MAX:-180}"   # nombre d'attentes de 10 s (30 min)
+TOOL=/app/scripts/import_v1.py
 
+log() { echo "[import-v1] $*"; }
+pg() { runuser -u postgres -- "$PG_BIN/psql" -tA -d "$DB_NAME" -c "$1" 2>/dev/null; }
+
+if [ ! -f "$TOOL" ]; then
+  log "Outil d'import absent de cette version de MyElectricalData : import ignoré"
+  exit 0
+fi
 if [ ! -f "$SRC" ]; then
   log "Fichier introuvable : $SRC (import ignoré)"
   exit 0
 fi
 
+# --- Attendre les PDL de la version new (migrations appliquées et PDL récupérés) ---
+n=0
+for i in $(seq 1 "$WAIT_MAX"); do
+  n=$(pg "SELECT count(*) FROM pdls" || true)
+  [[ "$n" =~ ^[0-9]+$ ]] || n=0
+  [ "$n" -gt 0 ] && break
+  [ "$i" -eq 1 ] && log "En attente des PDL de la version new avant l'import..."
+  sleep 10
+done
+if [ "$n" -eq 0 ]; then
+  log "Aucun PDL dans la version new après $((WAIT_MAX * 10 / 60)) min : import non lancé."
+  log "Vérifiez la synchronisation (page Tableau de bord), puis redémarrez l'add-on."
+  exit 0
+fi
+# Laisser le temps aux autres PDL du compte d'être enregistrés
+sleep "${IMPORT_V1_SETTLE:-30}"
+log "$(pg "SELECT count(*) FROM pdls") PDL présent(s) dans la version new"
+
+# --- Copie de travail : la base v1 n'est jamais modifiée, et la copie (qui contient les anciens
+#     tokens v1) est supprimée à la fin ---
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
-chmod 755 "$WORK"
-cp "$SRC" "$WORK/v1.db"
+cp "$SRC" "$WORK/cache.db"
+for ext in -wal -shm; do [ -f "$SRC$ext" ] && cp "$SRC$ext" "$WORK/cache.db$ext"; done
 log "Lecture de $SRC"
 
-python3 - "$WORK/v1.db" "$WORK/v1.csv" <<'PY'
-import csv, sqlite3, sys
-db, out = sys.argv[1], sys.argv[2]
-c = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
-check = c.execute("PRAGMA integrity_check").fetchone()[0]
-if check != "ok":
-    sys.exit(f"[import-v1] Base v1 invalide ({check}), import annulé")
-n = {"daily": 0, "detailed": 0}
-with open(out, "w", newline="") as f:
-    w = csv.writer(f)
-    for pdl, d, v in c.execute("SELECT usage_point_id, date, value FROM consumption_daily WHERE blacklist = 0"):
-        w.writerow([pdl, d[:10], "daily", "", v]); n["daily"] += 1
-    for pdl, d, v in c.execute("SELECT usage_point_id, date, value FROM consumption_detail WHERE blacklist = 0"):
-        w.writerow([pdl, d[:10], "detailed", d[11:16], v]); n["detailed"] += 1
-print(f"[import-v1] Lu dans la v1 : {n['daily']} jours, {n['detailed']} mesures détaillées")
+# --- Révision Alembic : certaines installations v1 (images non publiées sur GitHub, ex. via
+#     l'add-on d'alexbelgium) ont une révision inconnue de l'outil, avec des tables de données
+#     identiques. Si toutes les colonnes lues par l'outil sont présentes, la COPIE est alignée
+#     sur la révision attendue ; sinon l'outil refusera la base avec son propre message. ---
+python - "$WORK/cache.db" /app/src/services/import_v1.py <<'PY' || exit 1
+import re, sqlite3, sys
+db, tool = sys.argv[1:]
+m = re.search(r'V1_ALEMBIC_HEAD\s*=\s*"(\w+)"', open(tool, encoding="utf-8").read())
+if not m:
+    sys.exit(0)
+head = m.group(1)
+c = sqlite3.connect(db)
 try:
-    prod = c.execute("SELECT (SELECT count(*) FROM production_daily) + (SELECT count(*) FROM production_detail)").fetchone()[0]
-    if prod:
-        print(f"[import-v1] {prod} mesures de production présentes dans la v1, non importées (pas encore prises en charge)")
+    rev = c.execute("SELECT version_num FROM alembic_version").fetchone()
 except sqlite3.Error:
-    pass
+    sys.exit(0)  # pas une base v1 : l'outil le dira
+rev = rev[0] if rev else None
+if rev == head:
+    sys.exit(0)
+needed = {
+    "usage_points": {"usage_point_id"},
+    "consumption_daily": {"usage_point_id", "date", "value", "blacklist", "fail_count"},
+    "production_daily": {"usage_point_id", "date", "value", "blacklist", "fail_count"},
+    "consumption_detail": {"usage_point_id", "date", "value", "interval"},
+    "production_detail": {"usage_point_id", "date", "value", "interval"},
+    "consumption_daily_max_power": {"usage_point_id", "date", "event_date", "value", "blacklist", "fail_count"},
+}
+missing = []
+for table, cols in needed.items():
+    have = {r[1] for r in c.execute(f"PRAGMA table_info({table})")}
+    missing += [f"{table}.{col}" for col in sorted(cols - have)]
+if missing:
+    print(f"[import-v1] Révision v1 {rev} inconnue et colonnes absentes : {', '.join(missing)}")
+    sys.exit(0)  # l'outil refusera la base avec son propre message
+c.execute("UPDATE alembic_version SET version_num = ?", (head,))
+c.commit()
+print(f"[import-v1] Révision v1 {rev} inconnue de l'outil, mais tables de données identiques : "
+      f"copie de travail alignée sur {head} (le fichier d'origine n'est pas modifié)")
 PY
-chmod 644 "$WORK/v1.csv"
 
-log "Sauvegarde de la base new dans /data/backup-avant-import-v1.sql"
-runuser -u postgres -- "$PG_BIN/pg_dump" "$DB_NAME" > /data/backup-avant-import-v1.sql
+ARGS=("$WORK/cache.db")
+if [ "$DRY_RUN" = "true" ]; then
+  ARGS+=(--dry-run)
+  log "Mode simulation : rien ne sera écrit"
+else
+  log "Sauvegarde de la base new dans /data/backup-avant-import-v1.sql"
+  if ! runuser -u postgres -- "$PG_BIN/pg_dump" "$DB_NAME" > /data/backup-avant-import-v1.sql; then
+    log "Sauvegarde impossible : import annulé, aucune donnée n'a été modifiée"
+    exit 1
+  fi
+fi
 
-runuser -u postgres -- "$PG_BIN/psql" -v ON_ERROR_STOP=1 -q -d "$DB_NAME" <<SQL
-BEGIN;
-CREATE TEMP TABLE v1_import (usage_point_id varchar(14), date date, granularity text, interval_start varchar(5), value integer);
-\copy v1_import FROM '$WORK/v1.csv' WITH (FORMAT csv)
-CREATE TEMP VIEW v1_match AS
-  SELECT i.*, c.value AS new_value FROM v1_import i
-  LEFT JOIN consumption_data c ON c.usage_point_id = i.usage_point_id AND c.date = i.date
-   AND c.granularity::text = i.granularity
-   AND (i.granularity = 'daily' OR c.interval_start = i.interval_start);
-\echo '[import-v1] Bilan par type :'
-SELECT granularity, count(new_value) AS deja_present, count(*) FILTER (WHERE new_value <> value) AS ecarts, count(*) FILTER (WHERE new_value IS NULL) AS ajoutes FROM v1_match GROUP BY 1 ORDER BY 1;
-INSERT INTO consumption_data (id, usage_point_id, date, granularity, interval_start, value, source, created_at, updated_at)
-  SELECT DISTINCT ON (usage_point_id, date, granularity, interval_start)
-         gen_random_uuid()::text, usage_point_id, date, granularity::datagranularity, interval_start, value, 'myelectricaldata', now(), now()
-  FROM v1_match WHERE new_value IS NULL;
-COMMIT;
-SQL
-log "Import terminé. Vous pouvez désactiver l'option import_v1."
+(cd /app && python "$TOOL" "${ARGS[@]}") 2>&1 | sed -u 's/^/[import-v1] /'
+rc=${PIPESTATUS[0]}
+
+if [ "$rc" -ne 0 ]; then
+  log "Import en échec (code $rc) : voir les lignes ci-dessus. Les données déjà présentes ne sont pas touchées."
+elif [ "$DRY_RUN" = "true" ]; then
+  log "Simulation terminée : désactivez « Simulation de l'import » et redémarrez l'add-on pour importer réellement."
+else
+  log "Import terminé. Vous pouvez désactiver l'option « Importer l'historique de la v1 »."
+fi
+exit "$rc"
