@@ -80,4 +80,4 @@ jobs:
           for alias in "Tempo, réglages par défaut" "Tempo, toutes les options"; do
             grep -qF "$alias" check.log || { echo "::error::Automatisation « $alias » absente du résultat"; exit 1; }
           done
-          grep -qF "notify.mobile_app_telephone" check.log || { echo "::error::Entrées du blueprint non appliquées"; exit 1; }
+          grep -qF "notify.mobile_app_telephone" check.log || { grep -v '^ *$' check.log | head -60 | while IFS= read -r l; do echo "::notice::$l"; done; echo "::error::Entrées du blueprint non appliquées"; exit 1; }
