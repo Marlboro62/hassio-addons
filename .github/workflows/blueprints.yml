@@ -23,7 +23,7 @@ jobs:
           python-version: "3.13"
 
       - name: Installer Home Assistant
-        run: pip install --quiet homeassistant
+        run: pip install --quiet homeassistant colorlog
 
       - name: Configuration de test
         run: |
@@ -69,6 +69,7 @@ jobs:
 
       - name: Vérifier avec Home Assistant
         run: |
+          set -o pipefail
           hass --script check_config -c cfg --info automation 2>&1 | tee check.log
           { echo '### check_config'; echo '```'; cat check.log; echo '```'; } >>"$GITHUB_STEP_SUMMARY"
           if grep -qiE "invalid|error|failed" check.log; then
