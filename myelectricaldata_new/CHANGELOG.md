@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.7.0.1
+
+- Import de l'historique v1 avec l'outil officiel de MyElectricalData 2.7.0 : consommation, production et puissance max, après récupération des PDL. Nouvelle option « Simulation de l'import » (import_v1_dry_run).
+
 ## 2.7.0
 
 - Basé sur MyElectricalData 2.7.0 : [notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.7.0).
