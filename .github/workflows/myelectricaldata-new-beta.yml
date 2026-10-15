@@ -1,0 +1,187 @@
+# Publie automatiquement la version de test (bêta) de l'add-on MyElectricalData new.
+#
+# - Planifié : toutes les 6 heures, publie la dernière release amont si elle est plus récente
+#   que celle de la bêta.
+# - Manuel (Actions → « MyElectricalData new : bêta » → Run workflow) : version amont et version
+#   de l'add-on au choix (ex. 2.5.5.1 pour une révision propre à l'add-on), essai à blanc possible.
+#
+# Ordre : images amd64 et aarch64 construites et vérifiées (serveurs GitHub x86 et ARM natifs),
+# envoyées sur Docker Hub, puis seulement la branche bêta est mise à jour, et une issue prévient.
+# Si un correctif de patches/ ne s'applique plus, la construction échoue et rien n'est publié.
+#
+# Prérequis : secret DOCKERHUB_TOKEN (jeton Docker Hub en lecture/écriture du compte marlboro62).
+name: "MyElectricalData new : bêta"
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      med_version:
+        description: "Version amont MyElectricalData (vide = dernière release)"
+        required: false
+      addon_version:
+        description: "Version de l'add-on (vide = version amont ; ex. 2.5.5.1 pour une révision)"
+        required: false
+      changelog:
+        description: "Ligne du CHANGELOG (vide = texte automatique)"
+        required: false
+      dry_run:
+        description: "Essai à blanc : construire et vérifier, sans rien publier"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: myelectricaldata-new-release
+  cancel-in-progress: false
+
+env:
+  BRANCH: test-myelectricaldata-new
+  ADDON_DIR: myelectricaldata_new
+  IMAGE: marlboro62/{arch}-myelectricaldata-new-beta
+  UPSTREAM: MyElectricalData/myelectricaldata_new
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.v.outputs.go }}
+      med: ${{ steps.v.outputs.med }}
+      addon: ${{ steps.v.outputs.addon }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BRANCH }}
+
+      - id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IN_MED: ${{ inputs.med_version }}
+          IN_ADDON: ${{ inputs.addon_version }}
+        run: |
+          current_med=$(sed -n 's/^ARG MED_VERSION=//p' "$ADDON_DIR/Dockerfile")
+          current_addon=$(sed -n 's/^version: "\(.*\)"/\1/p' "$ADDON_DIR/config.yaml")
+          latest=$(gh api "repos/$UPSTREAM/releases/latest" --jq .tag_name)
+          med=${IN_MED:-$latest}
+          addon=${IN_ADDON:-$med}
+          echo "Bêta actuelle : add-on $current_addon (amont $current_med) ; dernière release amont : $latest"
+          echo "Demandé : add-on $addon (amont $med)"
+
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$med" = "$current_med" ]; then
+            echo "Bêta déjà à jour, rien à faire."
+            echo "go=false" >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$addon" = "$current_addon" ] && [ "${{ inputs.dry_run }}" != "true" ]; then
+            echo "::error::La version $addon est déjà celle de la bêta : choisissez une autre version d'add-on (ex. $addon.1)."
+            exit 1
+          fi
+          gh api "repos/$UPSTREAM/git/ref/tags/$med" --silent \
+            || { echo "::error::Le tag amont $med n'existe pas."; exit 1; }
+          {
+            echo "go=true"
+            echo "med=$med"
+            echo "addon=$addon"
+          } >>"$GITHUB_OUTPUT"
+
+  build:
+    needs: check
+    if: needs.check.outputs.go == 'true'
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    env:
+      MED: ${{ needs.check.outputs.med }}
+      ADDON: ${{ needs.check.outputs.addon }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BRANCH }}
+
+      - name: Construire l'image
+        run: |
+          tag="${IMAGE/\{arch\}/${{ matrix.arch }}}:$ADDON"
+          echo "TAG=$tag" >>"$GITHUB_ENV"
+          docker build --pull --build-arg "MED_VERSION=$MED" -t "$tag" "$ADDON_DIR"
+
+      - name: Vérifier l'image
+        run: |
+          docker run --rm --entrypoint sh "$TAG" -c '
+            set -e
+            test "$MED_VERSION" = "'"$MED"'" || { echo "MED_VERSION=$MED_VERSION, attendu '"$MED"'"; exit 1; }
+            test -s /var/www/med/index.html
+            test -s /etc/nginx/conf.d/med.conf
+            test -x /run.sh
+            test -s /app/entrypoint.sh
+            echo "Image OK : MyElectricalData $MED_VERSION"'
+
+      - name: Connexion à Docker Hub
+        if: ${{ !inputs.dry_run }}
+        uses: docker/login-action@v3
+        with:
+          username: marlboro62
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Envoyer l'image
+        if: ${{ !inputs.dry_run }}
+        run: docker push "$TAG"
+
+  publish:
+    needs: [check, build]
+    if: ${{ needs.check.outputs.go == 'true' && !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    env:
+      MED: ${{ needs.check.outputs.med }}
+      ADDON: ${{ needs.check.outputs.addon }}
+      LINE: ${{ inputs.changelog }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BRANCH }}
+
+      - name: Vérifier que les deux images sont en ligne
+        run: |
+          for arch in amd64 aarch64; do
+            docker manifest inspect "${IMAGE/\{arch\}/$arch}:$ADDON" >/dev/null
+            echo "$arch : OK"
+          done
+
+      - name: Mettre à jour la branche bêta
+        run: |
+          sed -i "s/^ARG MED_VERSION=.*/ARG MED_VERSION=$MED/" "$ADDON_DIR/Dockerfile"
+          sed -i "s/^version: .*/version: \"$ADDON\"/" "$ADDON_DIR/config.yaml"
+          [ -n "$LINE" ] || LINE="Basé sur MyElectricalData $MED : [notes de version amont](https://github.com/$UPSTREAM/releases/tag/$MED)."
+          python3 - "$ADDON_DIR/CHANGELOG.md" "$ADDON" "$LINE" <<'EOF'
+          import sys
+          path, version, line = sys.argv[1:]
+          text = open(path, encoding="utf-8").read()
+          head, sep, rest = text.partition("\n\n")
+          open(path, "w", encoding="utf-8").write(f"{head}\n\n## {version}\n\n- {line}\n\n{rest}")
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "myelectricaldata_new beta $ADDON: upstream $MED (automatique)"
+          git push origin "HEAD:$BRANCH"
+
+      - name: Prévenir par une issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "Bêta MyElectricalData new $ADDON publiée : à tester" \
+            --body "La bêta **$ADDON** (MyElectricalData [$MED](https://github.com/$UPSTREAM/releases/tag/$MED)) est publiée, images amd64 et aarch64 vérifiées.
+
+          À faire :
+          1. Dans HA : Boutique → ⋮ → Rechercher des mises à jour, puis mettre à jour **MyElectricalData New Beta**.
+          2. Tester (synchro, exports, bouton « Exécuter » via la barre latérale, journaux).
+          3. Si tout va bien : Actions → **MyElectricalData new : stable** → Run workflow, version \`$ADDON\`. Cette issue sera fermée automatiquement."

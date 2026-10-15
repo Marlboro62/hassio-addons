@@ -1,0 +1,109 @@
+# Promeut une bêta testée en version stable de l'add-on MyElectricalData new.
+#
+# Manuel uniquement (Actions → « MyElectricalData new : stable » → Run workflow) :
+# - les images bêta amd64 et aarch64 sont recopiées sous le nom stable, sans reconstruction :
+#   c'est exactement l'image testée ;
+# - master reçoit les fichiers de l'add-on de la branche bêta (Dockerfile, patches, scripts,
+#   CHANGELOG…), sauf config.yaml dont seule la version change, et README.md ;
+# - la démo est reconstruite, l'issue « Bêta … à tester » est fermée.
+#
+# Prérequis : secret DOCKERHUB_TOKEN (jeton Docker Hub en lecture/écriture du compte marlboro62).
+name: "MyElectricalData new : stable"
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version de la bêta à promouvoir (vide = version actuelle de la bêta)"
+        required: false
+
+permissions:
+  contents: write
+  issues: write
+  actions: write
+
+concurrency:
+  group: myelectricaldata-new-release
+  cancel-in-progress: false
+
+env:
+  BETA_BRANCH: test-myelectricaldata-new
+  ADDON_DIR: myelectricaldata_new
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Version à promouvoir
+        env:
+          IN_VERSION: ${{ inputs.version }}
+        run: |
+          git fetch --quiet origin "$BETA_BRANCH"
+          beta=$(git show "origin/$BETA_BRANCH:$ADDON_DIR/config.yaml" | sed -n 's/^version: "\(.*\)"/\1/p')
+          stable=$(sed -n 's/^version: "\(.*\)"/\1/p' "$ADDON_DIR/config.yaml")
+          version=${IN_VERSION:-$beta}
+          echo "Bêta : $beta ; stable : $stable ; à promouvoir : $version"
+          if [ "$version" != "$beta" ]; then
+            echo "::error::La bêta est en $beta : on ne promeut que la version de la bêta (celle qui a été testée)."
+            exit 1
+          fi
+          if [ "$version" = "$stable" ]; then
+            echo "::error::La stable est déjà en $version."
+            exit 1
+          fi
+          echo "VERSION=$version" >>"$GITHUB_ENV"
+
+      - name: Connexion à Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: marlboro62
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Recopier les images bêta sous le nom stable
+        run: |
+          for arch in amd64 aarch64; do
+            docker buildx imagetools create \
+              -t "marlboro62/$arch-myelectricaldata-new:$VERSION" \
+              "marlboro62/$arch-myelectricaldata-new-beta:$VERSION"
+            docker manifest inspect "marlboro62/$arch-myelectricaldata-new:$VERSION" >/dev/null
+            echo "$arch : OK"
+          done
+
+      - name: Mettre à jour master
+        run: |
+          # Différences de config.yaml hors lignes propres à chaque variante : à reporter à la main
+          norm() { grep -vE '^(name|version|image|slug|stage):|^  8100/tcp: [0-9]+$' ; }
+          if ! diff <(git show "origin/$BETA_BRANCH:$ADDON_DIR/config.yaml" | norm) <(norm <"$ADDON_DIR/config.yaml") >config.diff; then
+            echo "::warning::config.yaml de la bêta diffère de la stable (options ?) : à reporter à la main si besoin."
+            { echo '### ⚠️ config.yaml : différences bêta / stable à vérifier'; echo '```diff'; cat config.diff; echo '```'; } >>"$GITHUB_STEP_SUMMARY"
+          fi
+          rm -f config.diff
+
+          # Fichiers de l'add-on repris de la bêta (y compris les suppressions, ex. un patch retiré),
+          # sauf config.yaml et README.md qui restent ceux de la stable
+          git rm -r -q "$ADDON_DIR"
+          git checkout "origin/$BETA_BRANCH" -- "$ADDON_DIR"
+          git checkout HEAD -- "$ADDON_DIR/config.yaml" "$ADDON_DIR/README.md"
+          sed -i "s/^version: .*/version: \"$VERSION\"/" "$ADDON_DIR/config.yaml"
+          git status --short
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "myelectricaldata_new $VERSION: promotion de la bêta testée (automatique)"
+          git push origin HEAD:master
+
+      - name: Reconstruire la démo et fermer l'issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Un push fait avec le jeton du workflow ne déclenche pas les autres workflows : démo lancée ici
+          gh workflow run demo.yml --ref master --repo "$GITHUB_REPOSITORY"
+          gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "Bêta MyElectricalData new $VERSION in:title" --json number --jq '.[].number' |
+            while read -r n; do
+              gh issue close "$n" --repo "$GITHUB_REPOSITORY" --comment "Promue en version stable $VERSION."
+            done
