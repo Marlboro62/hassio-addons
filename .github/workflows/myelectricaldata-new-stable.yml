@@ -98,6 +98,7 @@ jobs:
           git push origin HEAD:master
 
       - name: Reconstruire la démo et fermer l'issue
+        continue-on-error: true  # la publication est déjà faite : une issue impossible à créer ne doit pas la marquer en échec
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
