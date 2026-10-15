@@ -13,10 +13,13 @@ configuration:
     description: Logs détaillés du backend
   import_v1:
     name: Importer l'historique de la v1
-    description: "Au démarrage, importe la consommation de l'add-on MyElectricalData v1 (aucune donnée existante n'est écrasée). À désactiver une fois l'import terminé."
+    description: "Au démarrage, une fois vos PDL récupérés, importe la consommation, la production et la puissance max de l'add-on MyElectricalData v1 avec l'outil officiel (aucune donnée existante n'est écrasée). À désactiver une fois l'import terminé."
   import_v1_path:
     name: Base de la v1
     description: "Chemin du fichier cache.db de la v1. Par défaut, celui de l'add-on v1 de ce Home Assistant. Si la v1 est ailleurs, copiez cache.db dans /share et indiquez /share/cache.db."
+  import_v1_dry_run:
+    name: Simulation de l'import
+    description: "Compte ce qui serait importé, sans rien écrire (bilan dans le Journal). Désactivez-la ensuite pour l'import réel."
   periode_analyse:
     name: Période d'analyse
     description: "Période de référence des statistiques annuelles, appliquée à tous les navigateurs (la page Préférences de MyElectricalData ne règle que le navigateur utilisé). « defaut » laisse le réglage de la page Préférences."
