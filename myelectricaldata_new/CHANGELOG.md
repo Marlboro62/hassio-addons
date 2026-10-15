@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.5.5
+
+- Basé sur MyElectricalData 2.5.5 : gestion du HTTP 429 pendant la synchro, pas par relevé dans tous les calculs (kWh, Euro, exports, comparaisons).
+- Bouton « Exécuter » via la barre latérale corrigé en amont (PR #146) : le correctif propre à l’add-on est retiré.
+
 ## 2.5.3
 
 - Basé sur MyElectricalData 2.5.3 : import des statistiques compatible Home Assistant 2025.11 et suivants (mean_type, unit_class), export MQTT planifié complété (Zen Flex).
