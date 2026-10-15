@@ -8,7 +8,7 @@ blueprint:
 
     Utilise les capteurs créés par l'export Home Assistant de
     [MyElectricalData new](https://github.com/MyElectricalData/myelectricaldata_new) (mode client) :
-    `sensor.rte_tempo_today`, `sensor.rte_tempo_tomorrow` et `sensor.edf_tempo_tempo_info`.
+    `sensor.rte_tempo_today`, `sensor.rte_tempo_tomorrow` et `sensor.edf_tempo_info`.
 
 
     Blueprint non officiel :
@@ -39,9 +39,9 @@ blueprint:
         tempo_info:
           name: Jours Tempo restants
           description: >-
-            Capteur des jours restants (selon l'installation, sensor.edf_tempo_tempo_info ou
-            sensor.edf_tempo_info).
-          default: sensor.edf_tempo_tempo_info
+            Capteur des jours restants (sensor.edf_tempo_info ; sur certaines installations
+            sensor.edf_tempo_tempo_info, essayé automatiquement si le premier n'existe pas).
+          default: sensor.edf_tempo_info
           selector:
             entity:
               domain: sensor
@@ -145,7 +145,16 @@ variables:
   evening_reminder: !input evening_reminder
   today_entity: !input tempo_today
   tomorrow_entity: !input tempo_tomorrow
-  info_entity: !input tempo_info
+  info_input: !input tempo_info
+  # Capteur choisi, sinon l'un des deux noms que peut prendre le capteur de l'export
+  info_entity: >-
+    {%- set ns = namespace(e=info_input) -%}
+    {%- for e in [info_input, 'sensor.edf_tempo_info', 'sensor.edf_tempo_tempo_info'] -%}
+      {%- if state_attr(ns.e, 'days_red_detail') is none and state_attr(e, 'days_red_detail') is not none -%}
+        {%- set ns.e = e -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {{ ns.e }}
   today: "{{ states(today_entity) | upper }}"
   tomorrow: "{{ states(tomorrow_entity) | upper }}"
   noms: {"RED": "rouge", "WHITE": "blanc", "BLUE": "bleu"}

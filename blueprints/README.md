@@ -20,7 +20,7 @@ Blueprints **non officiels** pour [MyElectricalData new](https://github.com/MyEl
 2. **Créer une automatisation** à partir du blueprint.
 3. Renseignez l'**action de notification** (par exemple `notify.mobile_app_mon_telephone` : **Outils de développement → Actions**, tapez « notify » pour voir les vôtres), puis vos actions.
 
-Les capteurs Tempo sont préremplis (`sensor.rte_tempo_today`, `sensor.rte_tempo_tomorrow`, `sensor.edf_tempo_tempo_info`). Si les vôtres portent un autre nom, changez-les dans la section **Capteurs Tempo**.
+Les capteurs Tempo sont préremplis (`sensor.rte_tempo_today`, `sensor.rte_tempo_tomorrow`, `sensor.edf_tempo_info`). Selon l'installation, le capteur des jours restants peut aussi s'appeler `sensor.edf_tempo_tempo_info` : le blueprint essaie les deux. Si vos capteurs portent un autre nom, changez-les dans la section **Capteurs Tempo**.
 
 ### Exemple : radiateurs sur fil pilote
 
