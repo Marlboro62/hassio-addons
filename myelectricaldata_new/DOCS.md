@@ -83,6 +83,6 @@ Les lignes que la v1 avait enregistrées sans vraie donnée (consommation ou pui
 
 Aucune donnée de la new n'est écrasée : seules les dates manquantes sont complétées, et l'import peut être relancé sans risque. Une sauvegarde de la base est faite avant l'import réel ; elle est incluse dans les sauvegardes Home Assistant de l'add-on (**Paramètres → Système → Sauvegardes**).
 
-Si votre base v1 a une révision inconnue de l'outil officiel (par exemple `d4f21c9a8b6e`, add-on v1 d'alexbelgium) mais des tables de données identiques, l'add-on l'accepte : le Journal l'indique, et seule la copie de travail est ajustée.
+Si votre base v1 a une révision inconnue de l'outil officiel (par exemple `d4f21c9a8b6e`, add-on v1 d'alexbelgium) mais des tables de données identiques, l'add-on l'accepte ([signalé en amont, issue #164](https://github.com/MyElectricalData/myelectricaldata_new/issues/164)) : le Journal l'indique, et seule la copie de travail est ajustée.
 
 Si le bilan indique « PDL ignorés, absents de ce client », lancez une synchronisation depuis le Tableau de bord, attendez qu'elle se termine, puis redémarrez l'add-on.
