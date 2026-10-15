@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.7.0
+
+- Basé sur MyElectricalData 2.7.0 : [notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.7.0).
+
 ## 2.6.1
 
 - Basé sur MyElectricalData 2.6.1 : [notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.6.1).
