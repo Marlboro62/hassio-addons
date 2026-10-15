@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.7.0.2
+
+- Import v1 : accepte les bases v1 à révision non publiée (ex. d4f21c9a8b6e) dont les tables de données sont identiques ; seule la copie de travail est ajustée.
+
 ## 2.7.0.1
 
 - Import de l'historique v1 avec l'outil officiel de MyElectricalData 2.7.0 : consommation, production et puissance max, après récupération des PDL. Nouvelle option « Simulation de l'import » (import_v1_dry_run).
