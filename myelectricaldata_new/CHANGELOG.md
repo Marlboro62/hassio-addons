@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.9.0
+
+- Basé sur MyElectricalData 2.9.0 : [notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.9.0).
+
+## 2.7.1
+
+- Basé sur MyElectricalData 2.7.1 : [notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.7.1).
+
 ## 2.7.0.2
 
 - Import v1 : accepte les bases v1 à révision non publiée (ex. d4f21c9a8b6e) dont les tables de données sont identiques ; seule la copie de travail est ajustée.
