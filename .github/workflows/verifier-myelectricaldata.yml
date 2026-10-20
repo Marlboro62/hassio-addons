@@ -1,0 +1,63 @@
+# Vérifie une branche de MyElectricalData new (fork ou amont) avant d'ouvrir une PR :
+# ruff + mypy + tests unitaires du backend, lint + build du frontend.
+name: Vérifier une branche MyElectricalData
+
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: Dépôt à vérifier
+        default: Marlboro62/myelectricaldata_new
+      ref:
+        description: Branche, tag ou commit
+        required: true
+      tests:
+        description: Tests pytest à lancer (vide = tests/unit)
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: astral-sh/setup-uv@v4
+      - run: uv sync
+      - name: Ruff
+        run: uv run ruff check src tests
+      - name: Mypy
+        run: uv run mypy src --ignore-missing-imports
+      - name: Pytest
+        env:
+          TESTS: ${{ inputs.tests }}
+        run: uv run pytest ${TESTS:-tests/unit} -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        run: npm run build
