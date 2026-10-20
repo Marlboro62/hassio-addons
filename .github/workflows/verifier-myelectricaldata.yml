@@ -34,14 +34,30 @@ jobs:
           python-version: "3.11"
       - uses: astral-sh/setup-uv@v4
       - run: uv sync
+      # Mêmes contrôles que la CI amont (ruff et mypy sur src), plus les tests.
+      # Les erreurs remontent en annotations (lisibles sans accès aux journaux).
       - name: Ruff
-        run: uv run ruff check src tests
-      - name: Mypy
-        run: uv run mypy src --ignore-missing-imports
-      - name: Pytest
+        if: always()
+        run: uv run ruff check src --output-format=github
+      - name: Ruff (tests)
+        if: always()
         env:
           TESTS: ${{ inputs.tests }}
-        run: uv run pytest ${TESTS:-tests/unit} -q
+        run: uv run ruff check ${TESTS:-tests/unit} --output-format=github
+      - name: Mypy
+        if: always()
+        run: |
+          uv run mypy src --ignore-missing-imports > mypy.txt; rc=$?
+          grep -E "error:" mypy.txt | head -40 | sed -E 's/^([^:]+):([0-9]+): error: (.*)$/::error file=apps\/api\/\1,line=\2::\3/'
+          tail -1 mypy.txt; exit $rc
+      - name: Pytest
+        if: always()
+        env:
+          TESTS: ${{ inputs.tests }}
+        run: |
+          uv run pytest ${TESTS:-tests/unit} -q -p no:cacheprovider > pytest.txt 2>&1; rc=$?
+          grep -E "^(FAILED|ERROR) " pytest.txt | head -40 | sed 's/^/::error::/'
+          tail -1 pytest.txt | sed 's/^/::notice::/'; exit $rc
 
   frontend:
     runs-on: ubuntu-latest
@@ -58,6 +74,8 @@ jobs:
           node-version: 20
       - run: npm ci
       - name: Lint
+        if: always()
         run: npm run lint
       - name: Build
+        if: always()
         run: npm run build
