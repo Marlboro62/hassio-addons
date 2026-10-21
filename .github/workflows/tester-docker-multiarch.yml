@@ -1,0 +1,120 @@
+# Teste la construction multi-architecture (amd64 + arm64 en natif) d'une branche de
+# MyElectricalData new, avec les mêmes étapes que la PR, vers le registre temporaire
+# ttl.sh (images effacées automatiquement au bout d'une heure, rien n'est publié).
+name: Tester les images Docker multi-architecture
+
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: Dépôt à tester
+        default: Marlboro62/myelectricaldata_new
+      ref:
+        description: Branche, tag ou commit
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_PREFIX: ttl.sh/med-multiarch-${{ github.run_id }}
+
+jobs:
+  build:
+    name: Build ${{ matrix.image }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [backend, frontend]
+        arch: [amd64, arm64]
+        include:
+          - image: backend
+            context: ./apps/api
+          - image: frontend
+            context: ./apps/web
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.ref }}
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        timeout-minutes: 30
+        with:
+          context: ${{ matrix.context }}
+          platforms: linux/${{ matrix.arch }}
+          outputs: type=image,name=${{ env.IMAGE_PREFIX }}-${{ matrix.image }},push-by-digest=true,name-canonical=true,push=true
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.image }}-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  manifest:
+    name: Manifest ${{ matrix.image }}
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [backend, frontend]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digests-${{ matrix.image }}-*
+          path: /tmp/digests
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@v3
+      - name: Create and push manifest list
+        working-directory: /tmp/digests
+        env:
+          IMAGE: ${{ env.IMAGE_PREFIX }}-${{ matrix.image }}
+        run: |
+          docker buildx imagetools create -t "$IMAGE:1h" $(printf "$IMAGE@sha256:%s " *)
+          docker buildx imagetools inspect "$IMAGE:1h" | tee inspect.txt
+          for a in amd64 arm64; do
+            grep -q "linux/$a" inspect.txt && echo "::notice::${{ matrix.image }} : linux/$a présent" || { echo "::error::${{ matrix.image }} : linux/$a absent"; exit 1; }
+          done
+
+  run:
+    name: Démarrage ${{ matrix.image }} (${{ matrix.arch }})
+    needs: manifest
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [backend, frontend]
+        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - name: Tirer l'image multi-arch et la lancer
+        env:
+          IMAGE: ${{ env.IMAGE_PREFIX }}-${{ matrix.image }}:1h
+        run: |
+          docker pull "$IMAGE"
+          got=$(docker image inspect "$IMAGE" -f '{{.Architecture}}')
+          [ "$got" = "${{ matrix.arch }}" ] || { echo "::error::architecture $got au lieu de ${{ matrix.arch }}"; exit 1; }
+          if [ "${{ matrix.image }}" = backend ]; then
+            out=$(docker run --rm "$IMAGE" python -c "import platform, fastapi, sqlalchemy, asyncpg, aiosqlite, cryptography; print(platform.machine())")
+          else
+            out=$(docker run --rm "$IMAGE" sh -c "nginx -t 2>&1 && uname -m && ls /usr/share/nginx/html/index.html")
+          fi
+          echo "$out"
+          echo "::notice::${{ matrix.image }} ${{ matrix.arch }} : $(echo "$out" | tr '\n' ' ')"
