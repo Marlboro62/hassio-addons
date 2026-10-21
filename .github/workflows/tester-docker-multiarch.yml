@@ -114,7 +114,13 @@ jobs:
           if [ "${{ matrix.image }}" = backend ]; then
             out=$(docker run --rm "$IMAGE" python -c "import platform, fastapi, sqlalchemy, asyncpg, aiosqlite, cryptography; print(platform.machine())")
           else
-            out=$(docker run --rm "$IMAGE" sh -c "nginx -t 2>&1 && uname -m && ls /usr/share/nginx/html/index.html")
+            # Démarrage réel (entrypoint.sh puis nginx), puis lecture de la page d'accueil
+            docker run -d --name front -p 8080:80 "$IMAGE" >/dev/null
+            for i in $(seq 1 20); do curl -fsS http://localhost:8080/ -o page.html && break; sleep 1; done
+            docker logs front 2>&1 | tail -5
+            grep -q 'id="root"' page.html || { echo "::error::page d'accueil introuvable"; exit 1; }
+            out="$(docker exec front uname -m) nginx OK, page servie ($(wc -c < page.html) octets)"
+            docker rm -f front >/dev/null
           fi
           echo "$out"
           echo "::notice::${{ matrix.image }} ${{ matrix.arch }} : $(echo "$out" | tr '\n' ' ')"
