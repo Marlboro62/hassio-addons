@@ -14,6 +14,9 @@ on:
       tests:
         description: Tests pytest à lancer (vide = tests/unit)
         default: ""
+      web_tests:
+        description: Tests vitest du frontend à lancer (vide = aucun)
+        default: ""
 
 permissions:
   contents: read
@@ -79,3 +82,11 @@ jobs:
       - name: Build
         if: always()
         run: npm run build
+      - name: Tests vitest
+        if: always() && inputs.web_tests != ''
+        env:
+          WEB_TESTS: ${{ inputs.web_tests }}
+        run: |
+          npx vitest run $WEB_TESTS > vitest.txt 2>&1; rc=$?
+          grep -E "FAIL|✗|×|AssertionError" vitest.txt | head -30 | sed 's/^/::error::/'
+          grep -E "Tests +[0-9]" vitest.txt | sed 's/^/::notice::/'; exit $rc
