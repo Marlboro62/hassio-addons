@@ -2,6 +2,8 @@
 
 Thème **non officiel** aux couleurs de la [carte Linky](https://github.com/Marlboro62/content-card-linky-new) : bleu ardoise, accent bleu MyElectricalData, vert Linky, cartes arrondies. Il suit le mode **clair** ou **sombre** choisi dans le profil Home Assistant (Automatique, Clair ou Sombre).
 
+Démo : [aperçu en ligne, en clair et en sombre](https://marlboro62.github.io/hassio-addons/theme/) (tableau Énergie avec les couleurs Tempo, cartes, interrupteurs…). Elle lit directement le fichier du thème : elle est toujours à jour.
+
 ## Couleurs Tempo dans le tableau Énergie
 
 Le thème donne une couleur à chacun des **6 postes Tempo** dans le tableau Énergie (graphique de consommation et tableau « Totaux »), avec les mêmes couleurs que la [carte Linky Appareils](https://github.com/Marlboro62/linky-appareils-card) : HC en clair, HP en soutenu.

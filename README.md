@@ -19,7 +19,7 @@ Ces projets sont **non officiels**, maintenus par Marlboro62, sans lien avec l'�
 | [Carte Linky Appareils](https://github.com/Marlboro62/linky-appareils-card) | Coûts par circuit et par appareil (jour, mois, cycle), au tarif en cours |
 | [Carte Linky Solaire](https://github.com/Marlboro62/linky-solaire-card) | Produit, importé et exporté jour par jour, autoconsommation |
 | [Dashboards Grafana](https://github.com/Marlboro62/myelectricaldata-new-grafana) | Analyse la base PostgreSQL de l'add-on (Linky, Tempo, coûts) |
-| [Thème Home Assistant](https://github.com/Marlboro62/hassio-addons/tree/master/themes) | Couleurs de la carte Linky en clair et sombre, et les 6 couleurs Tempo dans le tableau Énergie |
+| [Thème Home Assistant](https://github.com/Marlboro62/hassio-addons/tree/master/themes) | Couleurs de la carte Linky en clair et sombre, et les 6 couleurs Tempo dans le tableau Énergie ([démo](https://marlboro62.github.io/hassio-addons/theme/)) |
 
 ## Installation
 

@@ -2,6 +2,8 @@
 # https://marlboro62.github.io/hassio-addons/demo/
 # L'interface est reprise telle quelle de l'image Docker de l'add-on stable,
 # puis la couche de simulation (dossier demo/) y est ajoutée.
+# La démo du thème Home Assistant (dossier themes/) est publiée à côté :
+# https://marlboro62.github.io/hassio-addons/theme/
 name: Démo de l'interface
 
 on:
@@ -10,6 +12,7 @@ on:
     paths:
       - myelectricaldata_new/config.yaml
       - demo/**
+      - themes/**
       - .github/workflows/demo.yml
   workflow_dispatch:
 
@@ -45,6 +48,9 @@ jobs:
         run: |
           python3 demo/build.py web site/demo /hassio-addons/demo demo
           printf '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=demo/"><a href="demo/">Démo MyElectricalData new</a>\n' > site/index.html
+          mkdir -p site/theme
+          cp themes/demo.html site/theme/index.html
+          cp themes/myelectricaldata.yaml site/theme/
           touch site/.nojekyll
 
       - uses: actions/upload-pages-artifact@v3

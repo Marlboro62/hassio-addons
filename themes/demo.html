@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thème MyElectricalData</title>
+<meta name="description" content="Aperçu du thème Home Assistant MyElectricalData, en clair et en sombre, avec les couleurs Tempo du tableau Énergie.">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* Aperçu simplifié de Home Assistant : toutes les couleurs viennent des
+     variables du thème (myelectricaldata.yaml), appliquées sur .ha. */
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { font-family: Roboto, system-ui, sans-serif; background: #0b1018; color: #e7edf5; }
+  .bar-top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 12px 16px;
+    background: #0b1018; color: #e7edf5; border-bottom: 1px solid #222c3c; font-size: .9rem; }
+  .bar-top strong { font-size: 1rem; }
+  .bar-top a { color: #8fb0f0; }
+  .bar-top .grow { flex: 1; }
+  .seg { display: inline-flex; gap: 4px; }
+  .seg button { font: inherit; font-size: .85rem; padding: 5px 12px; border-radius: 999px; cursor: pointer;
+    background: transparent; color: inherit; border: 1px solid #2f3d55; }
+  .seg button[aria-pressed="true"] { background: #1d93e3; border-color: #1d93e3; color: #0f1724; font-weight: 600; }
+  .err { padding: 24px 16px; color: #ee4a4a; }
+
+  .ha { display: flex; min-height: calc(100vh - 54px); background: var(--primary-background-color);
+    color: var(--primary-text-color); }
+  .sidebar { width: 220px; flex: none; background: var(--sidebar-background-color);
+    color: var(--sidebar-text-color); border-right: 1px solid var(--divider-color); padding: 8px 0; }
+  .sidebar .brand { display: flex; align-items: center; gap: 10px; padding: 10px 16px 14px; font-size: 1.15rem; }
+  .sidebar .item { display: flex; align-items: center; gap: 18px; margin: 2px 8px; padding: 9px 10px;
+    border-radius: 10px; font-size: .9rem; }
+  .sidebar .item i { color: var(--sidebar-icon-color); font-size: 22px; line-height: 1; }
+  .sidebar .item.sel { background: var(--sidebar-selected-background-color); color: var(--sidebar-selected-text-color); font-weight: 500; }
+  .sidebar .item.sel i { color: var(--sidebar-selected-icon-color); }
+  .main { flex: 1; min-width: 0; }
+  .header { display: flex; align-items: center; gap: 14px; height: 56px; padding: 0 16px;
+    background: var(--app-header-background-color); color: var(--app-header-text-color);
+    border-bottom: var(--app-header-border-bottom, none); font-size: 1.25rem; }
+  .header .grow { flex: 1; }
+  .header i { font-size: 22px; }
+  .tabs { display: flex; gap: 22px; padding: 0 16px; background: var(--app-header-background-color);
+    color: var(--app-header-text-color); font-size: .85rem; text-transform: uppercase; letter-spacing: .4px; }
+  .tabs span { padding: 10px 0 8px; opacity: .75; border-bottom: 2px solid transparent; }
+  .tabs span.sel { opacity: 1; border-bottom-color: var(--app-header-selection-bar-color); }
+
+  .view { padding: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; align-items: start; }
+  .wide { grid-column: 1 / -1; }
+  .card { background: var(--ha-card-background, var(--card-background-color)); border: var(--ha-card-border-width, 1px) solid var(--ha-card-border-color, var(--divider-color));
+    border-radius: var(--ha-card-border-radius, 12px); box-shadow: var(--ha-card-box-shadow, none); padding: 16px; }
+  .card h2 { margin: 0 0 12px; font-size: 1.2rem; font-weight: 400; }
+  .muted { color: var(--secondary-text-color); }
+  .small { font-size: .82rem; }
+
+  .row { display: flex; align-items: center; gap: 14px; padding: 7px 0; }
+  .row i { font-size: 24px; color: var(--state-icon-color); width: 40px; text-align: center; }
+  .row i.on { color: var(--state-active-color); }
+  .row .name { flex: 1; }
+  .switch { width: 36px; height: 14px; border-radius: 7px; position: relative; background: var(--switch-unchecked-track-color); }
+  .switch::after { content: ""; position: absolute; top: -3px; left: -2px; width: 20px; height: 20px; border-radius: 50%;
+    background: var(--switch-unchecked-button-color); box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+  .switch.on { background: var(--switch-checked-track-color); }
+  .switch.on::after { left: 18px; background: var(--switch-checked-button-color); }
+  .slider { height: 4px; border-radius: 2px; background: var(--slider-track-color); position: relative; margin: 14px 0 6px; }
+  .slider b { position: absolute; inset: 0 40% 0 0; background: var(--slider-color); border-radius: 2px; }
+  .slider b::after { content: ""; position: absolute; right: -8px; top: -6px; width: 16px; height: 16px; border-radius: 50%; background: var(--slider-color); }
+  .field { margin-top: 14px; background: var(--input-fill-color); border-radius: 6px 6px 0 0; padding: 8px 12px 6px;
+    border-bottom: 1px solid var(--input-idle-line-color); }
+  .field small { display: block; color: var(--input-label-ink-color); font-size: .72rem; }
+  .field span { color: var(--input-ink-color); }
+  .btns { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  .btn { padding: 8px 16px; border-radius: 999px; font-size: .88rem; font-weight: 500; }
+  .btn.fill { background: var(--primary-color); color: var(--mdc-theme-on-primary, #fff); }
+  .btn.text { color: var(--primary-color); }
+  .badges { display: flex; flex-wrap: wrap; gap: 8px; }
+  .badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 8px; border-radius: var(--ha-badge-border-radius, 999px);
+    background: var(--ha-card-background, var(--card-background-color)); border: 1px solid var(--ha-card-border-color, var(--divider-color)); font-size: .85rem; }
+  .badge i { font-size: 18px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .chip { padding: 5px 12px; border-radius: 8px; background: var(--chip-background-color); font-size: .82rem; }
+  .status { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .status span { padding: 4px 10px; border-radius: 999px; font-size: .8rem; color: #0f1724; font-weight: 500; }
+
+  /* Tableau Énergie */
+  .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; margin-top: 8px; font-size: .8rem; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .sw { width: 22px; height: 12px; border-radius: 3px; border: 1px solid; display: inline-block; flex: none; }
+  svg.chart { width: 100%; height: auto; display: block; }
+  svg.chart text { fill: var(--secondary-text-color); font-size: 11px; }
+  svg.chart line { stroke: var(--divider-color); }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  th { text-align: left; font-weight: 500; padding: 10px 8px; border-bottom: 1px solid var(--divider-color); }
+  td { padding: 10px 8px; border-bottom: 1px solid var(--divider-color); }
+  th.n, td.n { text-align: right; white-space: nowrap; }
+  tr.total td { font-weight: 500; border-bottom: none; }
+  .gauge { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .gauge svg { width: 200px; max-width: 100%; }
+  .gauge .v { font-size: 2rem; margin-top: -62px; margin-bottom: 18px; }
+
+  @media (max-width: 760px) {
+    .sidebar { display: none; }
+    .view { grid-template-columns: 1fr; padding: 8px; }
+    svg.chart text { font-size: 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="bar-top">
+  <strong>Thème « MyElectricalData »</strong>
+  <span class="seg" id="mode" role="group" aria-label="Mode">
+    <button data-v="dark">Sombre</button><button data-v="light">Clair</button>
+  </span>
+  <span class="grow"></span>
+  <a href="https://github.com/Marlboro62/hassio-addons/tree/master/themes">Installation et fichier du thème</a>
+</div>
+<div id="app"></div>
+
+<script>
+(() => {
+  // Une semaine Tempo fictive : couleur du jour, kWh HC et HP
+  const DAYS = [
+    ["lun.", "BLEU", 9.8, 11.2], ["mar.", "BLEU", 8.9, 10.4], ["mer.", "BLANC", 10.6, 12.9],
+    ["jeu.", "ROUGE", 11.4, 6.1], ["ven.", "BLANC", 9.7, 11.8], ["sam.", "BLEU", 10.2, 14.6], ["dim.", "BLEU", 9.4, 13.9],
+  ];
+  // Ordre des sources du réseau = ordre des couleurs du thème (-0 à -5)
+  const SOURCES = [["HC", "BLEU"], ["HP", "BLEU"], ["HC", "BLANC"], ["HP", "BLANC"], ["HC", "ROUGE"], ["HP", "ROUGE"]];
+  const PRICE = { "HC BLEU": .1325, "HP BLEU": .1612, "HC BLANC": .1499, "HP BLANC": .1871, "HC ROUGE": .1575, "HP ROUGE": .7062 };
+  const fmt = (n, d = 2) => n.toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const color = (i) => `var(--energy-grid-consumption-color-${i}, var(--energy-grid-consumption-color))`;
+  // Comme Home Assistant : trait plein, remplissage à 50 % d'opacité
+  const fill = (i) => `color-mix(in srgb, ${color(i)} 50%, transparent)`;
+
+  // Lecteur YAML minimal, suffisant pour un fichier de thème : « clé: valeur »,
+  // imbrication par indentation, commentaires (# hors guillemets).
+  function parseYaml(txt) {
+    const root = {}, stack = [{ indent: -1, obj: root }];
+    for (const line of txt.split(/\r?\n/)) {
+      const m = line.match(/^(\s*)([\w.-]+):\s*(?:"([^"]*)"|'([^']*)'|([^#]*?))?\s*(?:#.*)?$/);
+      if (!m) continue;
+      const indent = m[1].length, key = m[2];
+      const val = m[3] ?? m[4] ?? (m[5] || "");
+      while (stack[stack.length - 1].indent >= indent) stack.pop();
+      const parent = stack[stack.length - 1].obj;
+      if (m[3] === undefined && m[4] === undefined && val === "") {
+        parent[key] = {};
+        stack.push({ indent, obj: parent[key] });
+      } else parent[key] = val;
+    }
+    return root;
+  }
+
+  let theme = null;
+  let mode = "dark";
+  try { mode = localStorage.getItem("med-theme-mode") || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"); } catch (e) {}
+
+  function applyTheme() {
+    const ha = document.querySelector(".ha");
+    if (!ha || !theme) return;
+    const { modes = {}, ...base } = theme;
+    ha.removeAttribute("style");
+    for (const [k, v] of Object.entries({ ...base, ...(modes[mode] || {}) })) ha.style.setProperty(`--${k}`, String(v));
+    document.querySelectorAll("#mode button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === mode)));
+  }
+
+  function chart() {
+    const W = 700, H = 276, L = 34, B = 32, T = 28;
+    const max = 30, y = (v) => T + (H - T - B) * (1 - v / max);
+    const bw = (W - L) / DAYS.length;
+    let s = "";
+    for (let v = 0; v <= max; v += 10) s += `<line x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+    DAYS.forEach(([d, c, hc, hp], i) => {
+      const x = L + i * bw + bw * .2, w = bw * .6;
+      const iHC = SOURCES.findIndex(([p, cc]) => p === "HC" && cc === c), iHP = iHC + 1;
+      s += `<rect x="${x}" y="${y(hc)}" width="${w}" height="${y(0) - y(hc)}" rx="3" style="fill:${fill(iHC)};stroke:${color(iHC)}"/>`;
+      s += `<rect x="${x}" y="${y(hc + hp)}" width="${w}" height="${y(hc) - y(hc + hp)}" rx="3" style="fill:${fill(iHP)};stroke:${color(iHP)}"/>`;
+      s += `<text x="${x + w / 2}" y="${H - 8}" text-anchor="middle">${d}</text>`;
+    });
+    return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Consommation de la semaine par poste Tempo">${s}<text x="${L + 6}" y="18">kWh</text></svg>`;
+  }
+
+  function totals() {
+    let sumE = 0, sumC = 0;
+    const rows = SOURCES.map(([p, c], i) => {
+      const e = DAYS.filter((d) => d[1] === c).reduce((a, d) => a + (p === "HC" ? d[2] : d[3]), 0);
+      const cost = e * PRICE[`${p} ${c}`];
+      sumE += e; sumC += cost;
+      return `<tr><td><span class="sw" style="background:${fill(i)};border-color:${color(i)}"></span></td><td>Linky ${p} ${c}</td><td class="n">${fmt(e, 1)} kWh</td><td class="n">${fmt(cost)} €</td></tr>`;
+    }).join("");
+    return `<table><thead><tr><th style="width:40px"></th><th>Source</th><th class="n">Énergie</th><th class="n">Coût</th></tr></thead>
+      <tbody>${rows}<tr class="total"><td></td><td>Total du réseau</td><td class="n">${fmt(sumE, 1)} kWh</td><td class="n">${fmt(sumC)} €</td></tr></tbody></table>`;
+  }
+
+  function render() {
+    const legend = SOURCES.map(([p, c], i) => `<span><i class="sw" style="background:${fill(i)};border-color:${color(i)}"></i>${p} ${c.charAt(0) + c.slice(1).toLowerCase()}</span>`).join("");
+    document.getElementById("app").innerHTML = `
+<div class="ha">
+  <nav class="sidebar">
+    <div class="brand"><i class="mdi mdi-menu"></i>Home Assistant</div>
+    <div class="item"><i class="mdi mdi-view-dashboard"></i>Aperçu</div>
+    <div class="item sel"><i class="mdi mdi-lightning-bolt"></i>Énergie</div>
+    <div class="item"><i class="mdi mdi-flash"></i>MyElectricalData</div>
+    <div class="item"><i class="mdi mdi-chart-box"></i>Historique</div>
+    <div class="item"><i class="mdi mdi-hammer"></i>Outils de développement</div>
+    <div class="item"><i class="mdi mdi-cog"></i>Paramètres</div>
+  </nav>
+  <div class="main">
+    <div class="header">Énergie<span class="grow"></span><i class="mdi mdi-calendar"></i><i class="mdi mdi-dots-vertical"></i></div>
+    <div class="tabs"><span class="sel">Électricité</span><span>Aperçu</span></div>
+    <div class="view">
+      <div class="card wide">
+        <h2>Consommation d'électricité</h2>
+        ${chart()}
+        <div class="legend">${legend}</div>
+      </div>
+      <div class="card wide"><h2>Totaux</h2>${totals()}</div>
+      <div class="card">
+        <h2>Électricité bas-carbone</h2>
+        <div class="gauge">
+          <svg viewBox="0 0 200 110" aria-hidden="true">
+            <path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="var(--divider-color)" stroke-width="16"/>
+            <path d="M20 100 A80 80 0 0 1 176 82" fill="none" stroke="var(--energy-non-fossil-color)" stroke-width="16"/>
+          </svg>
+          <div class="v">94 %</div>
+          <div class="muted small">Électricité bas-carbone consommée</div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Maison</h2>
+        <div class="row"><i class="mdi mdi-water-boiler on"></i><span class="name">Chauffe-eau</span><span class="switch on"></span></div>
+        <div class="row"><i class="mdi mdi-radiator"></i><span class="name">Radiateurs (éco)</span><span class="switch"></span></div>
+        <div class="row"><i class="mdi mdi-lightbulb on" style="color:var(--state-light-active-color)"></i><span class="name">Salon</span><span class="switch on"></span></div>
+        <div class="slider"><b></b></div>
+        <div class="muted small">Luminosité 60 %</div>
+        <div class="field"><small>Puissance souscrite</small><span>6 kVA</span></div>
+        <div class="btns"><span class="btn fill">Enregistrer</span><span class="btn text">Annuler</span></div>
+      </div>
+      <div class="card">
+        <h2>Tempo</h2>
+        <div class="badges">
+          <span class="badge"><i class="mdi mdi-circle" style="color:#3f7ff0"></i>Aujourd'hui : BLEU</span>
+          <span class="badge"><i class="mdi mdi-circle" style="color:var(--error-color)"></i>Demain : ROUGE</span>
+          <span class="badge"><i class="mdi mdi-calendar-alert" style="color:var(--warning-color)"></i>18 jours rouges</span>
+        </div>
+        <div class="chips"><span class="chip">HC 22 h - 6 h</span><span class="chip">Offre Tempo</span><span class="chip">6 kVA</span></div>
+        <div class="status">
+          <span style="background:var(--success-color)">Synchro OK</span><span style="background:var(--info-color)">Export HA</span>
+          <span style="background:var(--warning-color)">Quota 80 %</span><span style="background:var(--error-color)">Jour rouge</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>`;
+    applyTheme();
+  }
+
+  document.getElementById("mode").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button");
+    if (!b) return;
+    mode = b.dataset.v;
+    try { localStorage.setItem("med-theme-mode", mode); } catch (e) {}
+    applyTheme();
+  });
+
+  fetch("myelectricaldata.yaml", { cache: "no-cache" })
+    .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); })
+    .then((txt) => { theme = parseYaml(txt).MyElectricalData; render(); })
+    .catch((e) => { document.getElementById("app").innerHTML = `<div class="err">Impossible de charger le thème (myelectricaldata.yaml) : ${e.message}</div>`; });
+})();
+</script>
+</body>
+</html>
