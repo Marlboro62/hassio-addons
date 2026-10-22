@@ -16,6 +16,9 @@ Add-on **non officiel**, **pour amd64 et Raspberry Pi 4 ou 5** (aarch64, HAOS 64
 - Synchronisation automatique via la passerelle [www.v2.myelectricaldata.fr](https://www.v2.myelectricaldata.fr)
 - Base PostgreSQL intégrée, données incluses dans les sauvegardes Home Assistant
 - Export vers Home Assistant (capteurs MQTT et tableau de bord Énergie), vers un broker MQTT ou vers VictoriaMetrics, configurable dans l'interface
+- Noms des capteurs Home Assistant en français par défaut (option « Langue des noms des capteurs » pour garder l'anglais, `entity_id` inchangés)
+- Offres obsolètes (grilles désactivées) synchronisées et sélectionnables, pour retrouver l'offre réellement souscrite
+- Détail des taxes dans la page Consommation (€) : énergie HT, accise, abonnement HT et TVA
 - Accès en lecture seule à la base pour Grafana (optionnel), avec des [dashboards prêts à l'emploi](https://github.com/Marlboro62/myelectricaldata-new-grafana)
 
 ## Informations
