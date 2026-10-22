@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.9.0.3
+
+- Page Consommation (€) : détail des taxes comprises dans le total (énergie HT, accise sur l'électricité, abonnement HT, TVA), dans le détail de chaque période.
+
+## 2.9.0.2
+
+- Offres obsolètes (grilles désactivées) synchronisées et sélectionnables : une offre choisie qui devient obsolète n'est plus supprimée et le PDL garde sa sélection (issue amont #173).
+
+## 2.9.0.1
+
+- Noms des capteurs Home Assistant en français par défaut, avec une option pour garder les noms anglais (page Home Assistant de l'interface). Les entity_id ne changent pas.
+
 ## 2.9.0
 
 - Basé sur MyElectricalData 2.9.0 : [notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.9.0).
