@@ -87,8 +87,9 @@
   .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; margin-top: 8px; font-size: .8rem; }
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .sw { width: 22px; height: 12px; border-radius: 3px; border: 1px solid; display: inline-block; flex: none; }
-  svg.chart { width: 100%; height: auto; display: block; }
-  svg.chart text { fill: var(--secondary-text-color); font-size: 11px; }
+  /* Dessiné à la largeur réelle de la carte : textes et hauteur constants */
+  svg.chart { width: 100%; height: 260px; display: block; }
+  svg.chart text { fill: var(--secondary-text-color); font-size: 12px; }
   svg.chart line { stroke: var(--divider-color); }
   table { width: 100%; border-collapse: collapse; font-size: .9rem; }
   th { text-align: left; font-weight: 500; padding: 10px 8px; border-bottom: 1px solid var(--divider-color); }
@@ -102,7 +103,6 @@
   @media (max-width: 760px) {
     .sidebar { display: none; }
     .view { grid-template-columns: 1fr; padding: 8px; }
-    svg.chart text { font-size: 20px; }
   }
 </style>
 </head>
@@ -164,20 +164,25 @@
     document.querySelectorAll("#mode button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === mode)));
   }
 
-  function chart() {
-    const W = 700, H = 276, L = 34, B = 32, T = 28;
+  function chart(W) {
+    const H = 260, L = 34, B = 30, T = 28;
     const max = 30, y = (v) => T + (H - T - B) * (1 - v / max);
     const bw = (W - L) / DAYS.length;
     let s = "";
     for (let v = 0; v <= max; v += 10) s += `<line x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
     DAYS.forEach(([d, c, hc, hp], i) => {
-      const x = L + i * bw + bw * .2, w = bw * .6;
+      const w = Math.min(bw * .6, 90), x = L + i * bw + (bw - w) / 2;
       const iHC = SOURCES.findIndex(([p, cc]) => p === "HC" && cc === c), iHP = iHC + 1;
       s += `<rect x="${x}" y="${y(hc)}" width="${w}" height="${y(0) - y(hc)}" rx="3" style="fill:${fill(iHC)};stroke:${color(iHC)}"/>`;
       s += `<rect x="${x}" y="${y(hc + hp)}" width="${w}" height="${y(hc) - y(hc + hp)}" rx="3" style="fill:${fill(iHP)};stroke:${color(iHP)}"/>`;
       s += `<text x="${x + w / 2}" y="${H - 8}" text-anchor="middle">${d}</text>`;
     });
     return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Consommation de la semaine par poste Tempo">${s}<text x="${L + 6}" y="18">kWh</text></svg>`;
+  }
+
+  function drawChart() {
+    const box = document.getElementById("chart");
+    if (box) box.innerHTML = chart(Math.max(300, Math.round(box.clientWidth)));
   }
 
   function totals() {
@@ -211,7 +216,7 @@
     <div class="view">
       <div class="card wide">
         <h2>Consommation d'électricité</h2>
-        ${chart()}
+        <div id="chart"></div>
         <div class="legend">${legend}</div>
       </div>
       <div class="card wide"><h2>Totaux</h2>${totals()}</div>
@@ -253,6 +258,8 @@
   </div>
 </div>`;
     applyTheme();
+    drawChart();
+    new ResizeObserver(drawChart).observe(document.getElementById("chart"));
   }
 
   document.getElementById("mode").addEventListener("click", (ev) => {
