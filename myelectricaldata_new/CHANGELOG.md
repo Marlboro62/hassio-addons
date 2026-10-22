@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.9.0.3
+
+- Page Consommation (€) : détail des taxes comprises dans le total (énergie HT, accise sur l'électricité, abonnement HT, TVA), dans le détail de chaque période.
+
 ## 2.9.0.2
 
 - Offres obsolètes (grilles désactivées) synchronisées et sélectionnables : une offre choisie qui devient obsolète n'est plus supprimée et le PDL garde sa sélection (issue amont #173).
