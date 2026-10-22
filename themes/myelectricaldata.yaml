@@ -1,0 +1,329 @@
+# Thème Home Assistant « MyElectricalData »
+# Reprend les couleurs et les formes de la carte content-card-linky-new :
+# bleu ardoise, accent bleu MyElectricalData, vert Linky, HC bleu / HP orange.
+# Modes clair et sombre : HA bascule selon le réglage du profil (Automatique, Clair ou Sombre).
+#
+# Installation :
+#   1. Copier ce fichier dans /config/themes/
+#   2. Dans configuration.yaml :
+#        frontend:
+#          themes: !include_dir_merge_named themes
+#   3. Redémarrer HA (ou Outils de développement → Actions → frontend.reload_themes)
+#   4. Profil → Thème : « MyElectricalData »
+
+MyElectricalData:
+  # ---------- Commun aux deux modes ----------
+  # Formes (cartes arrondies comme la carte Linky)
+  ha-card-border-radius: "18px"
+  ha-card-border-width: "1px"
+  ha-dialog-border-radius: "18px"
+  ha-badge-border-radius: "999px"
+  mdc-shape-small: "10px"
+  mdc-shape-medium: "14px"
+  mdc-shape-large: "18px"
+  ha-border-radius-pill: "999px"
+
+  # Couleurs fixes (identiques à la carte)
+  error-color: "#ee4a4a"
+  warning-color: "#f0a33a"
+  success-color: "#5fcf8a"
+  info-color: "#1d93e3"
+
+  # Tableau Énergie
+  energy-grid-consumption-color: "#1d93e3"
+  energy-grid-return-color: "#5fcf8a"
+  energy-solar-color: "#f5b82e"
+  energy-non-fossil-color: "#96d21f"
+  energy-battery-in-color: "#4a7bd8"
+  energy-battery-out-color: "#96d21f"
+  energy-gas-color: "#d27333"
+  energy-water-color: "#3f7ff0"
+
+  # Tempo EDF : une couleur par source « Consommation du réseau », dans l'ordre
+  # des sources de Paramètres → Tableaux de bord → Énergie (0 = la première).
+  # Ordre attendu : HC Bleu, HP Bleu, HC Blanc, HP Blanc, HC Rouge, HP Rouge.
+  # Mêmes couleurs que la carte Linky Appareils (HC clair, HP soutenu).
+  energy-grid-consumption-color-0: "#8fb0f0"   # HC Bleu
+  energy-grid-consumption-color-1: "#3f7ff0"   # HP Bleu
+  energy-grid-consumption-color-2: "#f2f5f9"   # HC Blanc
+  energy-grid-consumption-color-3: "#aab3c0"   # HP Blanc
+  energy-grid-consumption-color-4: "#f39a9a"   # HC Rouge
+  energy-grid-consumption-color-5: "#ee4a4a"   # HP Rouge
+
+  # Badges
+  label-badge-red: "#ee4a4a"
+  label-badge-blue: "#1d93e3"
+  label-badge-green: "#5fcf8a"
+  label-badge-yellow: "#f5b82e"
+
+  modes:
+    # ---------- Sombre (fond de la carte Linky) ----------
+    dark:
+      # Couleurs principales
+      primary-color: "#1d93e3"
+      rgb-primary-color: "29, 147, 227"
+      dark-primary-color: "#1673b8"
+      light-primary-color: "#8fb0f0"
+      accent-color: "#96d21f"
+      rgb-accent-color: "150, 210, 31"
+      mdc-theme-primary: "#1d93e3"
+      mdc-theme-secondary: "#96d21f"
+      mdc-theme-on-primary: "#0f1724"
+      mdc-theme-on-secondary: "#0f1724"
+
+      # Fonds
+      primary-background-color: "#121a26"
+      secondary-background-color: "#1a2434"
+      lovelace-background: "#121a26"
+      view-background: "#121a26"
+      card-background-color: "#1a2434"
+      ha-card-background: "#1a2434"
+      ha-card-border-color: "#2f3d55"
+      ha-card-box-shadow: "0 2px 8px rgba(0, 0, 0, .25)"
+      mdc-theme-surface: "#1a2434"
+      ha-dialog-surface-background: "#1a2434"
+      clear-background-color: "#121a26"
+
+      # Textes
+      primary-text-color: "#e7edf5"
+      rgb-primary-text-color: "231, 237, 245"
+      secondary-text-color: "#8fa0b8"
+      rgb-secondary-text-color: "143, 160, 184"
+      disabled-text-color: "#5b6b82"
+      text-primary-color: "#0f1724"
+      text-light-primary-color: "#0f1724"
+      mdc-theme-text-primary-on-background: "#e7edf5"
+      mdc-theme-text-secondary-on-background: "#8fa0b8"
+      divider-color: "#2f3d55"
+      outline-color: "#2f3d55"
+
+      # Barre du haut
+      app-header-background-color: "#121a26"
+      app-header-text-color: "#e7edf5"
+      app-header-selection-bar-color: "#1d93e3"
+      app-header-edit-background-color: "#212d40"
+      app-header-border-bottom: "1px solid #2f3d55"
+
+      # Barre latérale
+      sidebar-background-color: "#1a2434"
+      sidebar-text-color: "#e7edf5"
+      sidebar-icon-color: "#8fa0b8"
+      sidebar-selected-background-color: "#212d40"
+      sidebar-selected-text-color: "#1d93e3"
+      sidebar-selected-icon-color: "#1d93e3"
+      sidebar-menu-button-text-color: "#e7edf5"
+      sidebar-menu-button-background-color: "#1a2434"
+
+      # Icônes et états
+      state-icon-color: "#8fa0b8"
+      state-active-color: "#96d21f"
+      state-inactive-color: "#5b6b82"
+      state-unavailable-color: "#3a4860"
+      state-light-active-color: "#f5b82e"
+      state-switch-active-color: "#96d21f"
+      state-input_boolean-active-color: "#96d21f"
+      state-binary_sensor-active-color: "#1d93e3"
+      state-climate-heat-color: "#d27333"
+      state-climate-cool-color: "#4a7bd8"
+      state-climate-auto-color: "#96d21f"
+      state-cover-active-color: "#1d93e3"
+      state-fan-active-color: "#1d93e3"
+      state-lock-locked-color: "#5fcf8a"
+      state-lock-unlocked-color: "#ee4a4a"
+      state-alarm_control_panel-armed_away-color: "#5fcf8a"
+      state-alarm_control_panel-disarmed-color: "#8fa0b8"
+      state-alarm_control_panel-triggered-color: "#ee4a4a"
+      state-person-home-color: "#96d21f"
+      state-person-not_home-color: "#8fa0b8"
+      state-sun-above_horizon-color: "#f5b82e"
+      history-unavailable-color: "#2f3d55"
+      history-unknown-color: "#3a4860"
+
+      # Interrupteurs et curseurs
+      switch-checked-color: "#96d21f"
+      switch-checked-button-color: "#96d21f"
+      switch-checked-track-color: "#4c8a0b"
+      switch-unchecked-button-color: "#8fa0b8"
+      switch-unchecked-track-color: "#2f3d55"
+      slider-color: "#1d93e3"
+      slider-track-color: "#2f3d55"
+      paper-slider-knob-color: "#1d93e3"
+      paper-slider-active-color: "#1d93e3"
+      paper-slider-container-color: "#2f3d55"
+
+      # Champs de saisie
+      input-fill-color: "#212d40"
+      input-disabled-fill-color: "#1a2434"
+      input-ink-color: "#e7edf5"
+      input-label-ink-color: "#8fa0b8"
+      input-disabled-ink-color: "#5b6b82"
+      input-idle-line-color: "#2f3d55"
+      input-hover-line-color: "#8fa0b8"
+      input-outlined-idle-border-color: "#2f3d55"
+      input-outlined-hover-border-color: "#8fa0b8"
+      input-dropdown-icon-color: "#8fa0b8"
+      mdc-text-field-fill-color: "#212d40"
+      mdc-text-field-ink-color: "#e7edf5"
+      mdc-text-field-label-ink-color: "#8fa0b8"
+      mdc-text-field-idle-line-color: "#2f3d55"
+      mdc-select-fill-color: "#212d40"
+      mdc-select-ink-color: "#e7edf5"
+      mdc-select-label-ink-color: "#8fa0b8"
+      mdc-select-idle-line-color: "#2f3d55"
+      mdc-select-dropdown-icon-color: "#8fa0b8"
+      mdc-checkbox-unchecked-color: "#8fa0b8"
+      mdc-radio-unchecked-color: "#8fa0b8"
+
+      # Puces, tableaux, code
+      chip-background-color: "#212d40"
+      ha-assist-chip-filled-container-color: "#212d40"
+      tile-color: "#212d40"
+      table-row-background-color: "#1a2434"
+      table-row-alternative-background-color: "#212d40"
+      data-table-background-color: "#1a2434"
+      markdown-code-background-color: "#212d40"
+      code-editor-background-color: "#121a26"
+      codemirror-keyword: "#8fb0f0"
+      codemirror-property: "#96d21f"
+      codemirror-string: "#eaa070"
+      codemirror-number: "#f5b82e"
+      codemirror-comment: "#5b6b82"
+      codemirror-atom: "#1d93e3"
+      scrollbar-thumb-color: "#2f3d55"
+
+    # ---------- Clair (version claire de la carte Linky) ----------
+    light:
+      # Couleurs principales
+      primary-color: "#1673b8"
+      rgb-primary-color: "22, 115, 184"
+      dark-primary-color: "#2f5fb8"
+      light-primary-color: "#8fb0f0"
+      accent-color: "#4c8a0b"
+      rgb-accent-color: "76, 138, 11"
+      mdc-theme-primary: "#1673b8"
+      mdc-theme-secondary: "#4c8a0b"
+      mdc-theme-on-primary: "#ffffff"
+      mdc-theme-on-secondary: "#ffffff"
+
+      # Tempo : HC Blanc plus soutenu, sinon invisible sur fond blanc
+      energy-grid-consumption-color-2: "#dbe2ec"
+
+      # Fonds
+      primary-background-color: "#e9eef4"
+      secondary-background-color: "#f2f5f9"
+      lovelace-background: "#e9eef4"
+      view-background: "#e9eef4"
+      card-background-color: "#ffffff"
+      ha-card-background: "#ffffff"
+      ha-card-border-color: "#dbe2ec"
+      ha-card-box-shadow: "0 1px 3px rgba(26, 36, 52, .08)"
+      mdc-theme-surface: "#ffffff"
+      ha-dialog-surface-background: "#ffffff"
+      clear-background-color: "#ffffff"
+
+      # Textes
+      primary-text-color: "#1a2434"
+      rgb-primary-text-color: "26, 36, 52"
+      secondary-text-color: "#5b6b82"
+      rgb-secondary-text-color: "91, 107, 130"
+      disabled-text-color: "#aab3c0"
+      text-primary-color: "#ffffff"
+      text-light-primary-color: "#1a2434"
+      mdc-theme-text-primary-on-background: "#1a2434"
+      mdc-theme-text-secondary-on-background: "#5b6b82"
+      divider-color: "#dbe2ec"
+      outline-color: "#dbe2ec"
+
+      # Barre du haut
+      app-header-background-color: "#1a2434"
+      app-header-text-color: "#e7edf5"
+      app-header-selection-bar-color: "#96d21f"
+      app-header-edit-background-color: "#5b6b82"
+      app-header-border-bottom: "none"
+
+      # Barre latérale
+      sidebar-background-color: "#ffffff"
+      sidebar-text-color: "#1a2434"
+      sidebar-icon-color: "#5b6b82"
+      sidebar-selected-background-color: "#e7edf5"
+      sidebar-selected-text-color: "#1673b8"
+      sidebar-selected-icon-color: "#1673b8"
+      sidebar-menu-button-text-color: "#1a2434"
+      sidebar-menu-button-background-color: "#ffffff"
+
+      # Icônes et états
+      state-icon-color: "#5b6b82"
+      state-active-color: "#4c8a0b"
+      state-inactive-color: "#aab3c0"
+      state-unavailable-color: "#dbe2ec"
+      state-light-active-color: "#d99a06"
+      state-switch-active-color: "#4c8a0b"
+      state-input_boolean-active-color: "#4c8a0b"
+      state-binary_sensor-active-color: "#1673b8"
+      state-climate-heat-color: "#c2560f"
+      state-climate-cool-color: "#2f5fb8"
+      state-climate-auto-color: "#4c8a0b"
+      state-cover-active-color: "#1673b8"
+      state-fan-active-color: "#1673b8"
+      state-lock-locked-color: "#1d8a4b"
+      state-lock-unlocked-color: "#ee4a4a"
+      state-alarm_control_panel-armed_away-color: "#1d8a4b"
+      state-alarm_control_panel-disarmed-color: "#5b6b82"
+      state-alarm_control_panel-triggered-color: "#ee4a4a"
+      state-person-home-color: "#4c8a0b"
+      state-person-not_home-color: "#5b6b82"
+      state-sun-above_horizon-color: "#d99a06"
+      history-unavailable-color: "#dbe2ec"
+      history-unknown-color: "#aab3c0"
+
+      # Interrupteurs et curseurs
+      switch-checked-color: "#4c8a0b"
+      switch-checked-button-color: "#4c8a0b"
+      switch-checked-track-color: "#96d21f"
+      switch-unchecked-button-color: "#ffffff"
+      switch-unchecked-track-color: "#aab3c0"
+      slider-color: "#1673b8"
+      slider-track-color: "#dbe2ec"
+      paper-slider-knob-color: "#1673b8"
+      paper-slider-active-color: "#1673b8"
+      paper-slider-container-color: "#dbe2ec"
+
+      # Champs de saisie
+      input-fill-color: "#f2f5f9"
+      input-disabled-fill-color: "#e9eef4"
+      input-ink-color: "#1a2434"
+      input-label-ink-color: "#5b6b82"
+      input-disabled-ink-color: "#aab3c0"
+      input-idle-line-color: "#dbe2ec"
+      input-hover-line-color: "#5b6b82"
+      input-outlined-idle-border-color: "#dbe2ec"
+      input-outlined-hover-border-color: "#5b6b82"
+      input-dropdown-icon-color: "#5b6b82"
+      mdc-text-field-fill-color: "#f2f5f9"
+      mdc-text-field-ink-color: "#1a2434"
+      mdc-text-field-label-ink-color: "#5b6b82"
+      mdc-text-field-idle-line-color: "#dbe2ec"
+      mdc-select-fill-color: "#f2f5f9"
+      mdc-select-ink-color: "#1a2434"
+      mdc-select-label-ink-color: "#5b6b82"
+      mdc-select-idle-line-color: "#dbe2ec"
+      mdc-select-dropdown-icon-color: "#5b6b82"
+      mdc-checkbox-unchecked-color: "#5b6b82"
+      mdc-radio-unchecked-color: "#5b6b82"
+
+      # Puces, tableaux, code
+      chip-background-color: "#e7edf5"
+      ha-assist-chip-filled-container-color: "#e7edf5"
+      tile-color: "#f2f5f9"
+      table-row-background-color: "#ffffff"
+      table-row-alternative-background-color: "#f2f5f9"
+      data-table-background-color: "#ffffff"
+      markdown-code-background-color: "#f2f5f9"
+      code-editor-background-color: "#f2f5f9"
+      codemirror-keyword: "#2f5fb8"
+      codemirror-property: "#4c8a0b"
+      codemirror-string: "#b35619"
+      codemirror-number: "#c2560f"
+      codemirror-comment: "#8fa0b8"
+      codemirror-atom: "#1673b8"
+      scrollbar-thumb-color: "#aab3c0"
