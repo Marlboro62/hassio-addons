@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.9.0.5
+
+- Page Home Assistant : le champ « Token d'accès longue durée » affiche un texte d'exemple clair au lieu d'un faux jeton, qui passait pour un jeton déjà enregistré (MyElectricalData/myelectricaldata_new#177).
+
 ## 2.9.0.4
 
 - Tableau Énergie : la raison d'un import sauté (URL ou jeton manquant, import désactivé) apparaît dans le journal, et les statistiques importées sont comptées au lieu de « 0 records » (MyElectricalData/myelectricaldata_new#177).
