@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.9.0.4
+
+- Tableau Énergie : la raison d'un import sauté (URL ou jeton manquant, import désactivé) apparaît dans le journal, et les statistiques importées sont comptées au lieu de « 0 records » (MyElectricalData/myelectricaldata_new#177).
+
 ## 2.9.0.3
 
 - Page Consommation (€) : détail des taxes comprises dans le total (énergie HT, accise sur l'électricité, abonnement HT, TVA), dans le détail de chaque période.
