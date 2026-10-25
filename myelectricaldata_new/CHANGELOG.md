@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.9.0.7
+
+- Saisie manuelle des prix : à la modification, les montants s'affichent au format français (18,36 au lieu de 18.36000).
+
 ## 2.9.0.6
 
 - Tableau de bord : saisie manuelle des prix de son offre (Base ou HC/HP, abonnement, prix du kWh) quand le contrat n'est pas dans la liste, par exemple une grille souscrite avant la grille actuelle. L'offre est conservée lors des synchronisations avec la passerelle.
