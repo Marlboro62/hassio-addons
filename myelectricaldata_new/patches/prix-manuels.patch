@@ -351,10 +351,10 @@ index 4539b0d..8f0d3a7 100644
  }
 diff --git a/apps/web/src/components/CustomOfferForm.tsx b/apps/web/src/components/CustomOfferForm.tsx
 new file mode 100644
-index 0000000..e0e9cbf
+index 0000000..9c13e0c
 --- /dev/null
 +++ b/apps/web/src/components/CustomOfferForm.tsx
-@@ -0,0 +1,233 @@
+@@ -0,0 +1,235 @@
 +import { useState } from 'react'
 +import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 +import { PencilLine, Save, Trash2, X } from 'lucide-react'
@@ -380,7 +380,9 @@ index 0000000..e0e9cbf
 +  hp_price: string
 +}
 +
-+const toText = (value: number | null | undefined) => (value == null ? '' : String(value))
++// L'API renvoie les montants au format de la base (« 18.36000 ») : affichés « 18,36 »
++const toText = (value: number | string | null | undefined) =>
++  value == null || value === '' || Number.isNaN(Number(value)) ? '' : String(Number(value)).replace('.', ',')
 +
 +// Accepte la virgule décimale (« 0,1885 »)
 +const toNumber = (value: string): number | null => {
@@ -498,7 +500,7 @@ index 0000000..e0e9cbf
 +    )
 +  }
 +
-+  const priceInput = (field: keyof FormState, label: string, unit: string) => (
++  const priceInput = (field: keyof FormState, label: string, unit: string, placeholder = '0,0000') => (
 +    <label className="block text-sm">
 +      <span className="text-gray-600 dark:text-gray-400">{label}</span>
 +      <div className="flex items-center gap-2 mt-1">
@@ -508,7 +510,7 @@ index 0000000..e0e9cbf
 +          aria-label={label}
 +          value={form[field]}
 +          onChange={update(field)}
-+          placeholder="0,0000"
++          placeholder={placeholder}
 +          className="input py-1.5"
 +          required
 +        />
@@ -554,7 +556,7 @@ index 0000000..e0e9cbf
 +      </div>
 +
 +      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-+        {priceInput('subscription_price', 'Abonnement', '€/mois')}
++        {priceInput('subscription_price', 'Abonnement', '€/mois', '0,00')}
 +        {form.offer_type === 'BASE' && priceInput('base_price', 'Prix du kWh', '€/kWh')}
 +      </div>
 +      {form.offer_type === 'HC_HP' && (
