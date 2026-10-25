@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.9.0.6
+
+- Tableau de bord : saisie manuelle des prix de son offre (Base ou HC/HP, abonnement, prix du kWh) quand le contrat n'est pas dans la liste, par exemple une grille souscrite avant la grille actuelle. L'offre est conservée lors des synchronisations avec la passerelle.
+
 ## 2.9.0.5
 
 - Page Home Assistant : le champ « Token d'accès longue durée » affiche un texte d'exemple clair au lieu d'un faux jeton, qui passait pour un jeton déjà enregistré (MyElectricalData/myelectricaldata_new#177).
