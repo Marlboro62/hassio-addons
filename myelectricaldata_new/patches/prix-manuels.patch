@@ -1,8 +1,8 @@
 diff --git a/apps/api/src/routers/energy_offers.py b/apps/api/src/routers/energy_offers.py
-index c0f43d6..46bf093 100644
+index c39cb13..407d7d5 100644
 --- a/apps/api/src/routers/energy_offers.py
 +++ b/apps/api/src/routers/energy_offers.py
-@@ -1,8 +1,12 @@
+@@ -1,9 +1,13 @@
 +from decimal import Decimal
 +from typing import Literal
 +
@@ -11,13 +11,14 @@ index c0f43d6..46bf093 100644
 +from pydantic import BaseModel, Field, model_validator
 +from sqlalchemy import select, func, update
  from sqlalchemy.ext.asyncio import AsyncSession
- from datetime import datetime, UTC
+ from datetime import date, datetime, time, timedelta, UTC
+ from zoneinfo import ZoneInfo
 -from ..models import User, EnergyProvider, EnergyOffer, OfferContribution, ContributionMessage
 +from ..models import PDL, User, EnergyProvider, EnergyOffer, OfferContribution, ContributionMessage
  from ..models.database import get_db
  from ..schemas import APIResponse, ErrorDetail
  from ..middleware import get_current_user, require_permission, require_action, require_not_demo
-@@ -10,6 +14,7 @@ from ..services.email import email_service
+@@ -11,6 +15,7 @@ from ..services.email import email_service
  from ..services.slack import slack_service
  from ..services.offers import get_all_offer_types
  from ..services.offer_names import clean_offer_name
@@ -25,7 +26,7 @@ index c0f43d6..46bf093 100644
  from ..config import settings
  import logging
  
-@@ -412,6 +417,45 @@ async def list_providers(db: AsyncSession = Depends(get_db)) -> APIResponse:
+@@ -457,6 +462,45 @@ async def list_providers(db: AsyncSession = Depends(get_db)) -> APIResponse:
      )
  
  
@@ -71,7 +72,7 @@ index c0f43d6..46bf093 100644
  @router.get("/offers", response_model=APIResponse)
  async def list_offers(
      provider_id: str | None = Query(None, description="Filter by provider ID", openapi_examples={"provider_uuid": {"summary": "Provider UUID", "value": "550e8400-e29b-41d4-a716-446655440000"}}),
-@@ -442,47 +486,89 @@ async def list_offers(
+@@ -487,47 +531,89 @@ async def list_offers(
      result = await db.execute(query)
      offers = result.scalars().all()
  
@@ -279,7 +280,7 @@ index 0000000..a2b8760
 +    offer.valid_to = None
 +    offer.price_updated_at = datetime.now(UTC)
 diff --git a/apps/api/src/services/sync.py b/apps/api/src/services/sync.py
-index 087f0f3..3291a79 100644
+index b856190..d87522c 100644
 --- a/apps/api/src/services/sync.py
 +++ b/apps/api/src/services/sync.py
 @@ -23,6 +23,7 @@ from ..models.ecowatt import EcoWatt
@@ -300,7 +301,7 @@ index 087f0f3..3291a79 100644
                  if local_provider.name not in synced_provider_names:
                      # Delete associated offers first (cascade)
                      await self.db.execute(
-@@ -1202,8 +1206,11 @@ class SyncService:
+@@ -1205,8 +1209,11 @@ class SyncService:
                      if local_id:
                          remote_to_local_provider[remote_id] = local_id
  
