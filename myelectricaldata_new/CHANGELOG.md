@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.9.2
+
+- MyElectricalData 2.9.2 : récupération automatique des données à l'ouverture de l'interface (mode client), clôture des anciennes grilles de prix à la veille d'une nouvelle (contributions). Les 7 correctifs de l'add-on sont conservés.
+
 ## 2.9.0.7
 
 - Saisie manuelle des prix : à la modification, les montants s'affichent au format français (18,36 au lieu de 18.36000).
