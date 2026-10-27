@@ -1,0 +1,620 @@
+diff --git a/apps/api/src/routers/energy_offers.py b/apps/api/src/routers/energy_offers.py
+index c39cb13..407d7d5 100644
+--- a/apps/api/src/routers/energy_offers.py
++++ b/apps/api/src/routers/energy_offers.py
+@@ -1,9 +1,13 @@
++from decimal import Decimal
++from typing import Literal
++
+ from fastapi import APIRouter, Depends, HTTPException, status, Query, Path, Body
+-from sqlalchemy import select, func
++from pydantic import BaseModel, Field, model_validator
++from sqlalchemy import select, func, update
+ from sqlalchemy.ext.asyncio import AsyncSession
+ from datetime import date, datetime, time, timedelta, UTC
+ from zoneinfo import ZoneInfo
+-from ..models import User, EnergyProvider, EnergyOffer, OfferContribution, ContributionMessage
++from ..models import PDL, User, EnergyProvider, EnergyOffer, OfferContribution, ContributionMessage
+ from ..models.database import get_db
+ from ..schemas import APIResponse, ErrorDetail
+ from ..middleware import get_current_user, require_permission, require_action, require_not_demo
+@@ -11,6 +15,7 @@ from ..services.email import email_service
+ from ..services.slack import slack_service
+ from ..services.offers import get_all_offer_types
+ from ..services.offer_names import clean_offer_name
++from ..services.custom_offers import CUSTOM_PROVIDER_ID, apply_custom_prices, ensure_custom_provider, get_custom_offer
+ from ..config import settings
+ import logging
+ 
+@@ -457,6 +462,45 @@ async def list_providers(db: AsyncSession = Depends(get_db)) -> APIResponse:
+     )
+ 
+ 
++def _offer_to_dict(o: EnergyOffer) -> dict:
++    """Offre telle que renvoyée par l'API (liste des offres, offres aux prix saisis)"""
++    return {
++        "id": o.id,
++        "provider_id": o.provider_id,
++        "name": o.name,
++        "offer_type": o.offer_type,
++        "description": o.description,
++        "subscription_price": o.subscription_price,
++        "base_price": o.base_price,
++        "hc_price": o.hc_price,
++        "hp_price": o.hp_price,
++        "base_price_weekend": o.base_price_weekend,
++        "hc_price_weekend": o.hc_price_weekend,
++        "hp_price_weekend": o.hp_price_weekend,
++        "tempo_blue_hc": o.tempo_blue_hc,
++        "tempo_blue_hp": o.tempo_blue_hp,
++        "tempo_white_hc": o.tempo_white_hc,
++        "tempo_white_hp": o.tempo_white_hp,
++        "tempo_red_hc": o.tempo_red_hc,
++        "tempo_red_hp": o.tempo_red_hp,
++        "ejp_normal": o.ejp_normal,
++        "ejp_peak": o.ejp_peak,
++        "hc_price_winter": o.hc_price_winter,
++        "hp_price_winter": o.hp_price_winter,
++        "hc_price_summer": o.hc_price_summer,
++        "hp_price_summer": o.hp_price_summer,
++        "peak_day_price": o.peak_day_price,
++        "hc_schedules": o.hc_schedules,
++        "power_kva": o.power_kva,
++        "price_updated_at": o.price_updated_at.isoformat() if o.price_updated_at else None,
++        "valid_from": o.valid_from.isoformat() if o.valid_from else None,
++        "valid_to": o.valid_to.isoformat() if o.valid_to else None,
++        "offer_url": o.offer_url,
++        "is_active": o.is_active,
++        "created_at": o.created_at.isoformat() if o.created_at else None,
++    }
++
++
+ @router.get("/offers", response_model=APIResponse)
+ async def list_offers(
+     provider_id: str | None = Query(None, description="Filter by provider ID", openapi_examples={"provider_uuid": {"summary": "Provider UUID", "value": "550e8400-e29b-41d4-a716-446655440000"}}),
+@@ -487,47 +531,89 @@ async def list_offers(
+     result = await db.execute(query)
+     offers = result.scalars().all()
+ 
+-    return APIResponse(
+-        success=True,
+-        data=[
+-            {
+-                "id": o.id,
+-                "provider_id": o.provider_id,
+-                "name": o.name,
+-                "offer_type": o.offer_type,
+-                "description": o.description,
+-                "subscription_price": o.subscription_price,
+-                "base_price": o.base_price,
+-                "hc_price": o.hc_price,
+-                "hp_price": o.hp_price,
+-                "base_price_weekend": o.base_price_weekend,
+-                "hc_price_weekend": o.hc_price_weekend,
+-                "hp_price_weekend": o.hp_price_weekend,
+-                "tempo_blue_hc": o.tempo_blue_hc,
+-                "tempo_blue_hp": o.tempo_blue_hp,
+-                "tempo_white_hc": o.tempo_white_hc,
+-                "tempo_white_hp": o.tempo_white_hp,
+-                "tempo_red_hc": o.tempo_red_hc,
+-                "tempo_red_hp": o.tempo_red_hp,
+-                "ejp_normal": o.ejp_normal,
+-                "ejp_peak": o.ejp_peak,
+-                "hc_price_winter": o.hc_price_winter,
+-                "hp_price_winter": o.hp_price_winter,
+-                "hc_price_summer": o.hc_price_summer,
+-                "hp_price_summer": o.hp_price_summer,
+-                "peak_day_price": o.peak_day_price,
+-                "hc_schedules": o.hc_schedules,
+-                "power_kva": o.power_kva,
+-                "price_updated_at": o.price_updated_at.isoformat() if o.price_updated_at else None,
+-                "valid_from": o.valid_from.isoformat() if o.valid_from else None,
+-                "valid_to": o.valid_to.isoformat() if o.valid_to else None,
+-                "offer_url": o.offer_url,
+-                "is_active": o.is_active,
+-                "created_at": o.created_at.isoformat() if o.created_at else None,
+-            }
+-            for o in offers
+-        ],
+-    )
++    return APIResponse(success=True, data=[_offer_to_dict(o) for o in offers])
++
++
++# Offres aux prix saisis à la main (mode client)
++
++
++class CustomOfferRequest(BaseModel):
++    """Abonnement et prix du kWh TTC de son contrat, quand ils ne sont pas dans la base des offres"""
++
++    name: str = Field("Mon offre", min_length=1, max_length=255, description="Nom affiché dans le choix de l'offre")
++    offer_type: Literal["BASE", "HC_HP"] = Field(..., description="BASE (prix unique) ou HC_HP (heures creuses / pleines)")
++    power_kva: int | None = Field(None, ge=1, le=36, description="Puissance souscrite (kVA)")
++    subscription_price: Decimal = Field(..., ge=0, le=1000, description="Abonnement mensuel TTC (€/mois)")
++    base_price: Decimal | None = Field(None, gt=0, le=5, description="Prix du kWh TTC, option Base (€/kWh)")
++    hc_price: Decimal | None = Field(None, gt=0, le=5, description="Prix du kWh TTC en heures creuses (€/kWh)")
++    hp_price: Decimal | None = Field(None, gt=0, le=5, description="Prix du kWh TTC en heures pleines (€/kWh)")
++
++    @model_validator(mode="after")
++    def _prices_for_type(self) -> "CustomOfferRequest":
++        if self.offer_type == "BASE" and self.base_price is None:
++            raise ValueError("Le prix du kWh est obligatoire pour une offre Base")
++        if self.offer_type == "HC_HP" and (self.hc_price is None or self.hp_price is None):
++            raise ValueError("Les prix des heures creuses et des heures pleines sont obligatoires")
++        return self
++
++
++def _require_client_mode() -> None:
++    # La passerelle a sa base d'offres modérée : la saisie de ses prix est propre au mode client
++    if not settings.CLIENT_MODE:
++        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
++
++
++@router.post("/custom-offers", response_model=APIResponse, status_code=status.HTTP_201_CREATED)
++async def create_custom_offer(
++    request: CustomOfferRequest,
++    current_user: User = Depends(require_not_demo),
++    db: AsyncSession = Depends(get_db),
++) -> APIResponse:
++    """Crée une offre avec ses propres prix (mode client), à choisir ensuite sur le PDL"""
++    _require_client_mode()
++    await ensure_custom_provider(db)
++    offer = EnergyOffer(provider_id=CUSTOM_PROVIDER_ID, valid_from=datetime.now(UTC))
++    apply_custom_prices(offer, **request.model_dump())
++    db.add(offer)
++    await db.commit()
++    await db.refresh(offer)
++    logger.info(f"[CUSTOM OFFER] Created {offer.offer_type} offer '{offer.name}'")
++    return APIResponse(success=True, data=_offer_to_dict(offer))
++
++
++@router.put("/custom-offers/{offer_id}", response_model=APIResponse)
++async def update_custom_offer(
++    request: CustomOfferRequest,
++    offer_id: str = Path(..., description="Identifiant de l'offre aux prix saisis"),
++    current_user: User = Depends(require_not_demo),
++    db: AsyncSession = Depends(get_db),
++) -> APIResponse:
++    """Modifie une offre aux prix saisis (les offres de la passerelle ne sont pas modifiables ici)"""
++    _require_client_mode()
++    offer = await get_custom_offer(db, offer_id)
++    if offer is None:
++        return APIResponse(success=False, error=ErrorDetail(code="NOT_FOUND", message="Offre aux prix saisis introuvable"))
++    apply_custom_prices(offer, **request.model_dump())
++    await db.commit()
++    await db.refresh(offer)
++    return APIResponse(success=True, data=_offer_to_dict(offer))
++
++
++@router.delete("/custom-offers/{offer_id}", response_model=APIResponse)
++async def delete_custom_offer(
++    offer_id: str = Path(..., description="Identifiant de l'offre aux prix saisis"),
++    current_user: User = Depends(require_not_demo),
++    db: AsyncSession = Depends(get_db),
++) -> APIResponse:
++    """Supprime une offre aux prix saisis ; les PDL qui l'avaient choisie n'ont plus d'offre"""
++    _require_client_mode()
++    offer = await get_custom_offer(db, offer_id)
++    if offer is None:
++        return APIResponse(success=False, error=ErrorDetail(code="NOT_FOUND", message="Offre aux prix saisis introuvable"))
++    await db.execute(update(PDL).where(PDL.selected_offer_id == offer_id).values(selected_offer_id=None))
++    await db.delete(offer)
++    await db.commit()
++    return APIResponse(success=True, data={"message": "Offre supprimée"})
+ 
+ 
+ # Contribution endpoints
+diff --git a/apps/api/src/services/custom_offers.py b/apps/api/src/services/custom_offers.py
+new file mode 100644
+index 0000000..a2b8760
+--- /dev/null
++++ b/apps/api/src/services/custom_offers.py
+@@ -0,0 +1,70 @@
++"""Offres aux prix saisis à la main (mode client)
++
++Pour un contrat dont les prix ne sont pas dans la base des offres (grille souscrite avant la grille
++actuelle, offre locale…), l'utilisateur saisit lui-même son abonnement et ses prix du kWh. L'offre est
++rangée sous un fournisseur réservé, à identifiant fixe : elle apparaît dans le choix de l'offre du PDL
++comme les autres, et la page Consommation (€), le simulateur et les exports l'utilisent sans changement.
++
++La synchro avec la passerelle est un miroir (elle supprime ce qui n'existe pas à distance) : elle ignore
++ce fournisseur et ses offres.
++"""
++
++from datetime import UTC, datetime
++from decimal import Decimal
++
++from sqlalchemy import select
++from sqlalchemy.ext.asyncio import AsyncSession
++
++from ..models.energy_provider import EnergyOffer, EnergyProvider
++
++CUSTOM_PROVIDER_ID = "custom-offers"
++CUSTOM_PROVIDER_NAME = "Mes prix (saisie manuelle)"
++
++# Types d'offre proposés à la saisie : prix unique ou heures creuses / pleines
++CUSTOM_OFFER_TYPES = ("BASE", "HC_HP")
++
++
++def is_custom_provider(provider_id: str | None) -> bool:
++    return provider_id == CUSTOM_PROVIDER_ID
++
++
++async def ensure_custom_provider(db: AsyncSession) -> EnergyProvider:
++    """Fournisseur réservé aux offres saisies, créé au premier besoin"""
++    provider = await db.get(EnergyProvider, CUSTOM_PROVIDER_ID)
++    if provider is None:
++        provider = EnergyProvider(id=CUSTOM_PROVIDER_ID, name=CUSTOM_PROVIDER_NAME, is_active=True)
++        db.add(provider)
++        await db.flush()
++    return provider
++
++
++async def get_custom_offer(db: AsyncSession, offer_id: str) -> EnergyOffer | None:
++    """Offre saisie à la main, None si elle n'existe pas ou vient de la passerelle"""
++    result = await db.execute(
++        select(EnergyOffer).where(EnergyOffer.id == offer_id, EnergyOffer.provider_id == CUSTOM_PROVIDER_ID)
++    )
++    return result.scalar_one_or_none()
++
++
++def apply_custom_prices(
++    offer: EnergyOffer,
++    *,
++    name: str,
++    offer_type: str,
++    power_kva: int | None,
++    subscription_price: Decimal,
++    base_price: Decimal | None,
++    hc_price: Decimal | None,
++    hp_price: Decimal | None,
++) -> None:
++    """Écrit les prix saisis ; les prix sans objet pour le type d'offre sont effacés"""
++    offer.name = name
++    offer.offer_type = offer_type
++    offer.power_kva = power_kva
++    offer.subscription_price = subscription_price
++    offer.base_price = base_price if offer_type == "BASE" else None
++    offer.hc_price = hc_price if offer_type == "HC_HP" else None
++    offer.hp_price = hp_price if offer_type == "HC_HP" else None
++    offer.is_active = True
++    offer.valid_to = None
++    offer.price_updated_at = datetime.now(UTC)
+diff --git a/apps/api/src/services/sync.py b/apps/api/src/services/sync.py
+index b856190..d87522c 100644
+--- a/apps/api/src/services/sync.py
++++ b/apps/api/src/services/sync.py
+@@ -23,6 +23,7 @@ from ..models.ecowatt import EcoWatt
+ from ..models.tempo_day import TempoDay, TempoColor
+ from ..models.zen_flex_day import ZenFlexDay, ZenFlexDayType
+ from .edf_zen_flex import OFFER_START, paris_today
++from .custom_offers import CUSTOM_PROVIDER_ID, is_custom_provider
+ from .upsert import ENERGY_KEY, conflict_target, dialect_insert, is_sqlite, sqlite_index_exists
+ from ..models.client_mode import (
+     AddressData,
+@@ -1132,6 +1133,9 @@ class SyncService:
+             local_providers = local_providers_result.scalars().all()
+ 
+             for local_provider in local_providers:
++                # Le fournisseur des prix saisis à la main n'existe que localement
++                if is_custom_provider(local_provider.id):
++                    continue
+                 if local_provider.name not in synced_provider_names:
+                     # Delete associated offers first (cascade)
+                     await self.db.execute(
+@@ -1205,8 +1209,11 @@ class SyncService:
+                     if local_id:
+                         remote_to_local_provider[remote_id] = local_id
+ 
+-            # Get ALL existing offer IDs (not just active) to detect deletions
+-            existing_result = await self.db.execute(select(EnergyOffer.id))
++            # Get ALL existing offer IDs (not just active) to detect deletions,
++            # sauf les offres aux prix saisis à la main, qui n'existent que localement
++            existing_result = await self.db.execute(
++                select(EnergyOffer.id).where(EnergyOffer.provider_id != CUSTOM_PROVIDER_ID)
++            )
+             existing_offer_ids = set(row[0] for row in existing_result.all())
+             synced_offer_ids: set[str] = set()
+ 
+diff --git a/apps/web/src/api/energy.ts b/apps/web/src/api/energy.ts
+index 4539b0d..8f0d3a7 100644
+--- a/apps/web/src/api/energy.ts
++++ b/apps/web/src/api/energy.ts
+@@ -372,4 +372,30 @@ export const energyApi = {
+   getSyncStatus: async () => {
+     return apiClient.get<SyncStatus>('admin/offers/sync-status')
+   },
++
++  // Mode client - Offre aux prix saisis à la main
++  createCustomOffer: async (data: CustomOfferData) => {
++    return apiClient.post<EnergyOffer>('energy/custom-offers', data)
++  },
++
++  updateCustomOffer: async (offerId: string, data: CustomOfferData) => {
++    return apiClient.put<EnergyOffer>(`energy/custom-offers/${offerId}`, data)
++  },
++
++  deleteCustomOffer: async (offerId: string) => {
++    return apiClient.delete(`energy/custom-offers/${offerId}`)
++  },
++}
++
++// Fournisseur réservé aux offres saisies à la main (mode client)
++export const CUSTOM_PROVIDER_ID = 'custom-offers'
++
++export interface CustomOfferData {
++  name: string
++  offer_type: 'BASE' | 'HC_HP'
++  power_kva: number | null
++  subscription_price: number
++  base_price?: number | null
++  hc_price?: number | null
++  hp_price?: number | null
+ }
+diff --git a/apps/web/src/components/CustomOfferForm.tsx b/apps/web/src/components/CustomOfferForm.tsx
+new file mode 100644
+index 0000000..9c13e0c
+--- /dev/null
++++ b/apps/web/src/components/CustomOfferForm.tsx
+@@ -0,0 +1,235 @@
++import { useState } from 'react'
++import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
++import { PencilLine, Save, Trash2, X } from 'lucide-react'
++import { energyApi, CUSTOM_PROVIDER_ID, type CustomOfferData, type EnergyOffer } from '@/api/energy'
++import { offersWithHistoryQueryOptions } from '@/api/energyQueries'
++import { toast } from '@/stores/notificationStore'
++
++interface CustomOfferFormProps {
++  selectedOfferId: string | null | undefined
++  subscribedPower: number | null | undefined
++  // Sélectionne l'offre sur le PDL (null pour la retirer)
++  onSelect: (offerId: string | null) => void
++  disabled?: boolean
++}
++
++interface FormState {
++  name: string
++  offer_type: 'BASE' | 'HC_HP'
++  power_kva: string
++  subscription_price: string
++  base_price: string
++  hc_price: string
++  hp_price: string
++}
++
++// L'API renvoie les montants au format de la base (« 18.36000 ») : affichés « 18,36 »
++const toText = (value: number | string | null | undefined) =>
++  value == null || value === '' || Number.isNaN(Number(value)) ? '' : String(Number(value)).replace('.', ',')
++
++// Accepte la virgule décimale (« 0,1885 »)
++const toNumber = (value: string): number | null => {
++  const parsed = Number(value.trim().replace(',', '.'))
++  return value.trim() === '' || Number.isNaN(parsed) ? null : parsed
++}
++
++const initialState = (offer: EnergyOffer | undefined, subscribedPower: number | null | undefined): FormState => ({
++  name: offer?.name ?? 'Mon offre',
++  offer_type: offer?.offer_type === 'BASE' ? 'BASE' : 'HC_HP',
++  power_kva: toText(offer?.power_kva ?? subscribedPower),
++  subscription_price: toText(offer?.subscription_price),
++  base_price: toText(offer?.base_price),
++  hc_price: toText(offer?.hc_price),
++  hp_price: toText(offer?.hp_price),
++})
++
++/**
++ * Offre aux prix saisis à la main (mode client).
++ *
++ * Pour un contrat absent de la base des offres (grille souscrite avant la grille actuelle…) :
++ * l'utilisateur saisit son abonnement et ses prix du kWh, l'offre est créée puis sélectionnée sur le PDL.
++ */
++export default function CustomOfferForm({ selectedOfferId, subscribedPower, onSelect, disabled = false }: CustomOfferFormProps) {
++  const queryClient = useQueryClient()
++  const { data: offers } = useQuery(offersWithHistoryQueryOptions())
++  const selectedCustomOffer = offers?.find((o) => o.id === selectedOfferId && o.provider_id === CUSTOM_PROVIDER_ID)
++
++  const [isOpen, setIsOpen] = useState(false)
++  const [form, setForm] = useState<FormState>(() => initialState(selectedCustomOffer, subscribedPower))
++
++  const refreshOffers = () => {
++    queryClient.invalidateQueries({ queryKey: ['energy-offers'] })
++    queryClient.invalidateQueries({ queryKey: ['energy-providers'] })
++  }
++
++  const saveMutation = useMutation({
++    mutationFn: async (data: CustomOfferData) => {
++      const response = selectedCustomOffer
++        ? await energyApi.updateCustomOffer(selectedCustomOffer.id, data)
++        : await energyApi.createCustomOffer(data)
++      if (!response.success || !response.data) {
++        throw new Error(response.error?.message || "Impossible d'enregistrer l'offre")
++      }
++      return response.data
++    },
++    onSuccess: (offer) => {
++      refreshOffers()
++      if (offer.id !== selectedOfferId) onSelect(offer.id)
++      setIsOpen(false)
++      toast.success('Prix enregistrés')
++    },
++    onError: (error: Error) => toast.error(error.message),
++  })
++
++  const deleteMutation = useMutation({
++    mutationFn: async (offerId: string) => {
++      const response = await energyApi.deleteCustomOffer(offerId)
++      if (!response.success) throw new Error(response.error?.message || "Impossible de supprimer l'offre")
++    },
++    onSuccess: () => {
++      refreshOffers()
++      // L'API retire déjà l'offre des PDL : on rafraîchit la carte
++      queryClient.invalidateQueries({ queryKey: ['pdls'] })
++      setIsOpen(false)
++      toast.success('Offre supprimée')
++    },
++    onError: (error: Error) => toast.error(error.message),
++  })
++
++  const open = () => {
++    setForm(initialState(selectedCustomOffer, subscribedPower))
++    setIsOpen(true)
++  }
++
++  const update = (field: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
++    setForm((prev) => ({ ...prev, [field]: e.target.value }))
++
++  const subscription = toNumber(form.subscription_price)
++  const prices =
++    form.offer_type === 'BASE'
++      ? { base_price: toNumber(form.base_price) }
++      : { hc_price: toNumber(form.hc_price), hp_price: toNumber(form.hp_price) }
++  const isValid =
++    form.name.trim() !== '' &&
++    subscription !== null &&
++    subscription >= 0 &&
++    Object.values(prices).every((p) => p !== null && p > 0)
++
++  const submit = (e: React.FormEvent) => {
++    e.preventDefault()
++    if (!isValid || subscription === null) return
++    saveMutation.mutate({
++      name: form.name.trim(),
++      offer_type: form.offer_type,
++      power_kva: toNumber(form.power_kva),
++      subscription_price: subscription,
++      ...prices,
++    })
++  }
++
++  const isBusy = disabled || saveMutation.isPending || deleteMutation.isPending
++
++  if (!isOpen) {
++    return (
++      <button
++        type="button"
++        onClick={open}
++        disabled={isBusy}
++        className="flex items-center gap-2 text-sm text-primary-600 dark:text-primary-400 hover:underline disabled:opacity-50"
++      >
++        <PencilLine size={14} />
++        {selectedCustomOffer ? 'Modifier mes prix' : 'Mon offre n’est pas dans la liste : saisir mes prix'}
++      </button>
++    )
++  }
++
++  const priceInput = (field: keyof FormState, label: string, unit: string, placeholder = '0,0000') => (
++    <label className="block text-sm">
++      <span className="text-gray-600 dark:text-gray-400">{label}</span>
++      <div className="flex items-center gap-2 mt-1">
++        <input
++          type="text"
++          inputMode="decimal"
++          aria-label={label}
++          value={form[field]}
++          onChange={update(field)}
++          placeholder={placeholder}
++          className="input py-1.5"
++          required
++        />
++        <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap">{unit}</span>
++      </div>
++    </label>
++  )
++
++  return (
++    <form
++      onSubmit={submit}
++      className="space-y-3 p-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40"
++    >
++      <p className="text-sm text-gray-600 dark:text-gray-400">
++        Prix TTC de votre contrat (facture ou grille tarifaire). L’offre est enregistrée sur cette installation et
++        utilisée pour les coûts en euros, le simulateur et les exports.
++      </p>
++
++      <label className="block text-sm">
++        <span className="text-gray-600 dark:text-gray-400">Nom de l’offre</span>
++        <input type="text" value={form.name} onChange={update('name')} maxLength={255} className="input py-1.5 mt-1" required />
++      </label>
++
++      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
++        <label className="block text-sm">
++          <span className="text-gray-600 dark:text-gray-400">Option tarifaire</span>
++          <select value={form.offer_type} onChange={update('offer_type')} className="input py-1.5 mt-1">
++            <option value="HC_HP">Heures Creuses / Pleines</option>
++            <option value="BASE">Base</option>
++          </select>
++        </label>
++        <label className="block text-sm">
++          <span className="text-gray-600 dark:text-gray-400">Puissance souscrite</span>
++          <select value={form.power_kva} onChange={update('power_kva')} className="input py-1.5 mt-1">
++            <option value="">Toutes</option>
++            {[3, 6, 9, 12, 15, 18, 24, 30, 36].map((kva) => (
++              <option key={kva} value={kva}>
++                {kva} kVA
++              </option>
++            ))}
++          </select>
++        </label>
++      </div>
++
++      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
++        {priceInput('subscription_price', 'Abonnement', '€/mois', '0,00')}
++        {form.offer_type === 'BASE' && priceInput('base_price', 'Prix du kWh', '€/kWh')}
++      </div>
++      {form.offer_type === 'HC_HP' && (
++        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
++          {priceInput('hc_price', 'Prix du kWh en heures creuses', '€/kWh')}
++          {priceInput('hp_price', 'Prix du kWh en heures pleines', '€/kWh')}
++        </div>
++      )}
++
++      <div className="flex flex-wrap items-center gap-2">
++        <button type="submit" disabled={isBusy || !isValid} className="btn btn-primary flex items-center gap-2 py-1.5">
++          <Save size={16} />
++          Enregistrer
++        </button>
++        <button type="button" onClick={() => setIsOpen(false)} disabled={isBusy} className="btn btn-secondary flex items-center gap-2 py-1.5">
++          <X size={16} />
++          Annuler
++        </button>
++        {selectedCustomOffer && (
++          <button
++            type="button"
++            onClick={() => deleteMutation.mutate(selectedCustomOffer.id)}
++            disabled={isBusy}
++            className="ml-auto flex items-center gap-2 text-sm text-red-600 dark:text-red-400 hover:underline disabled:opacity-50"
++          >
++            <Trash2 size={14} />
++            Supprimer cette offre
++          </button>
++        )}
++      </div>
++    </form>
++  )
++}
+diff --git a/apps/web/src/components/PDLCard.tsx b/apps/web/src/components/PDLCard.tsx
+index 851d7dd..58487ee 100644
+--- a/apps/web/src/components/PDLCard.tsx
++++ b/apps/web/src/components/PDLCard.tsx
+@@ -7,6 +7,7 @@ import { oauthApi } from '@/api/oauth'
+ import { syncApi } from '@/api/sync'
+ import type { PDL } from '@/types/api'
+ import OfferSelector from './OfferSelector'
++import CustomOfferForm from './CustomOfferForm'
+ 
+ interface PDLCardProps {
+   pdl: PDL
+@@ -924,6 +925,14 @@ export default function PDLCard({ pdl, onViewDetails, onDelete, isDemo = false,
+                       showExpired={showExpiredOffers}
+                       onHasExpiredOffersChange={setHasExpiredOffers}
+                     />
++                    {isClientMode && !isDemo && (
++                      <CustomOfferForm
++                        selectedOfferId={pdl.selected_offer_id}
++                        subscribedPower={pdl.subscribed_power}
++                        onSelect={(offerId) => updateSelectedOfferMutation.mutate(offerId)}
++                        disabled={updateSelectedOfferMutation.isPending}
++                      />
++                    )}
+                   </div>
+ 
+                   {/* Offpeak Hours */}

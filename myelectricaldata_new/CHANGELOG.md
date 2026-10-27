@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.10.0
+
+- Basé sur MyElectricalData 2.10.0 : [notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.10.0).
+
+## 2.9.2
+
+- MyElectricalData 2.9.2 : récupération automatique des données à l'ouverture de l'interface (mode client), clôture des anciennes grilles de prix à la veille d'une nouvelle (contributions). Les 7 correctifs de l'add-on sont conservés.
+
+## 2.9.0.7
+
+- Saisie manuelle des prix : à la modification, les montants s'affichent au format français (18,36 au lieu de 18.36000).
+
+## 2.9.0.6
+
+- Tableau de bord : saisie manuelle des prix de son offre (Base ou HC/HP, abonnement, prix du kWh) quand le contrat n'est pas dans la liste, par exemple une grille souscrite avant la grille actuelle. L'offre est conservée lors des synchronisations avec la passerelle.
+
+## 2.9.0.5
+
+- Page Home Assistant : le champ « Token d'accès longue durée » affiche un texte d'exemple clair au lieu d'un faux jeton, qui passait pour un jeton déjà enregistré (MyElectricalData/myelectricaldata_new#177).
+
+## 2.9.0.4
+
+- Tableau Énergie : la raison d'un import sauté (URL ou jeton manquant, import désactivé) apparaît dans le journal, et les statistiques importées sont comptées au lieu de « 0 records » (MyElectricalData/myelectricaldata_new#177).
+
 ## 2.9.0.3
 
 - Page Consommation (€) : détail des taxes comprises dans le total (énergie HT, accise sur l'électricité, abonnement HT, TVA), dans le détail de chaque période.
