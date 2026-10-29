@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.12.1.2
+
+- Synchronisation : les périodes antérieures à la mise en service du contrat ne sont plus redemandées à chaque synchro (avertissements NO_DATA, quota de la passerelle consommé pour rien), correctif de la PR MyElectricalData/myelectricaldata_new#189 (issue #188).
+
 ## 2.12.1.1
 
 - Import de l'historique v1 : l'add-on n'ajuste plus la révision Alembic de la copie de travail, l'outil officiel accepte depuis MyElectricalData 2.12.0 une base v1 de révision inconnue dont les colonnes sont présentes (MyElectricalData/myelectricaldata_new#164) ; le bilan indique la révision réellement lue.
