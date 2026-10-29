@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.12.1.1
+
+- Import de l'historique v1 : l'add-on n'ajuste plus la révision Alembic de la copie de travail, l'outil officiel accepte depuis MyElectricalData 2.12.0 une base v1 de révision inconnue dont les colonnes sont présentes (MyElectricalData/myelectricaldata_new#164) ; le bilan indique la révision réellement lue.
+
 ## 2.12.1
 
 - Basé sur MyElectricalData 2.12.1 : [notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.12.1).
