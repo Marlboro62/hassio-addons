@@ -33,7 +33,7 @@ Add-ons non officiels, maintenus par Marlboro62.
 | Add-on | Description |
 | --- | --- |
 | [MyElectricalData new](https://github.com/Marlboro62/hassio-addons/tree/master/myelectricaldata_new) | Mode client de [MyElectricalData new](https://github.com/MyElectricalData/myelectricaldata_new) : interface web, synchro Linky/Tempo, PostgreSQL intégré. |
-| [MyElectricalData (v1)](https://github.com/Marlboro62/hassio-addons/tree/master/enedisgateway2mqtt) | Version patchée de l'add-on MyElectricalData v1, issue du dépôt d'[alexbelgium](https://github.com/alexbelgium/hassio-addons). |
+| [MyElectricalData (v1)](https://github.com/Marlboro62/hassio-addons/tree/master/enedisgateway2mqtt) | ⚠️ **Obsolète** : la v1 est abandonnée en amont. Migrez vers MyElectricalData new, dont l'option `import_v1` reprend l'historique. Version patchée de l'add-on v1 d'[alexbelgium](https://github.com/alexbelgium/hassio-addons). |
 
 ## 🧩 Fait partie de l'écosystème MyElectricalData new
 

@@ -1,5 +1,10 @@
 # Home assistant add-on: MyElectricalData
 
+> [!WARNING]
+> **Add-on obsolète.** MyElectricalData v1 est abandonnée par son développeur et cet add-on n'est plus mis à jour.
+> Migrez vers l'add-on **[MyElectricalData new](https://github.com/Marlboro62/hassio-addons/tree/master/myelectricaldata_new)** :
+> son option `import_v1` reprend l'historique de la v1 (consommation, production, puissance max) depuis `cache.db`.
+> Cet add-on reste installé et fonctionne tant que la passerelle v1 répond, mais il ne recevra plus de correctifs.
 
 I maintain this and other Home Assistant add-ons in my free time: keeping up with upstream changes, HA changes, and testing on real hardware takes a lot of time (and some money). I use around 5-10 of my >110 addons so regularly I install test machines (and purchase some test services such as vpn) that I don't use myself to troubleshoot and improve the addons
 

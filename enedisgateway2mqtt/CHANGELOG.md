@@ -1,3 +1,8 @@
+## Obsolète (29/10/2026)
+
+- MyElectricalData v1 est abandonnée en amont : cet add-on n'est plus maintenu.
+- Migrez vers l'add-on MyElectricalData new, dont l'option `import_v1` reprend l'historique de la v1.
+
 ## 0.15.1-annual-tempo.2026.10.1 (2026-10-04)
 
 ### Corrigé
