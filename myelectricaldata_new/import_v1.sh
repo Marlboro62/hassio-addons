@@ -53,46 +53,6 @@ cp "$SRC" "$WORK/cache.db"
 for ext in -wal -shm; do [ -f "$SRC$ext" ] && cp "$SRC$ext" "$WORK/cache.db$ext"; done
 log "Lecture de $SRC"
 
-# --- Révision Alembic : certaines installations v1 (images non publiées sur GitHub, ex. via
-#     l'add-on d'alexbelgium) ont une révision inconnue de l'outil, avec des tables de données
-#     identiques. Si toutes les colonnes lues par l'outil sont présentes, la COPIE est alignée
-#     sur la révision attendue ; sinon l'outil refusera la base avec son propre message. ---
-python - "$WORK/cache.db" /app/src/services/import_v1.py <<'PY' || exit 1
-import re, sqlite3, sys
-db, tool = sys.argv[1:]
-m = re.search(r'V1_ALEMBIC_HEAD\s*=\s*"(\w+)"', open(tool, encoding="utf-8").read())
-if not m:
-    sys.exit(0)
-head = m.group(1)
-c = sqlite3.connect(db)
-try:
-    rev = c.execute("SELECT version_num FROM alembic_version").fetchone()
-except sqlite3.Error:
-    sys.exit(0)  # pas une base v1 : l'outil le dira
-rev = rev[0] if rev else None
-if rev == head:
-    sys.exit(0)
-needed = {
-    "usage_points": {"usage_point_id"},
-    "consumption_daily": {"usage_point_id", "date", "value", "blacklist", "fail_count"},
-    "production_daily": {"usage_point_id", "date", "value", "blacklist", "fail_count"},
-    "consumption_detail": {"usage_point_id", "date", "value", "interval"},
-    "production_detail": {"usage_point_id", "date", "value", "interval"},
-    "consumption_daily_max_power": {"usage_point_id", "date", "event_date", "value", "blacklist", "fail_count"},
-}
-missing = []
-for table, cols in needed.items():
-    have = {r[1] for r in c.execute(f"PRAGMA table_info({table})")}
-    missing += [f"{table}.{col}" for col in sorted(cols - have)]
-if missing:
-    print(f"[import-v1] Révision v1 {rev} inconnue et colonnes absentes : {', '.join(missing)}")
-    sys.exit(0)  # l'outil refusera la base avec son propre message
-c.execute("UPDATE alembic_version SET version_num = ?", (head,))
-c.commit()
-print(f"[import-v1] Révision v1 {rev} inconnue de l'outil, mais tables de données identiques : "
-      f"copie de travail alignée sur {head} (le fichier d'origine n'est pas modifié)")
-PY
-
 ARGS=("$WORK/cache.db")
 if [ "$DRY_RUN" = "true" ]; then
   ARGS+=(--dry-run)
