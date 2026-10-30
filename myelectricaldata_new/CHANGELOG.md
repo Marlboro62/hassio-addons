@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.12.1.3
+
+- Heures creuses / heures pleines : une plage qui bascule au milieu d'une demi-heure (ex. 23h32-5h32) répartit le créneau au prorata des minutes au lieu de le classer en entier, correctif de la PR MyElectricalData/myelectricaldata_new#193 (écart HC/HP avec le compteur signalé sur le forum).
+
 ## 2.12.1.2
 
 - Synchronisation : les périodes antérieures à la mise en service du contrat ne sont plus redemandées à chaque synchro (avertissements NO_DATA, quota de la passerelle consommé pour rien), correctif de la PR MyElectricalData/myelectricaldata_new#189 (issue #188).
