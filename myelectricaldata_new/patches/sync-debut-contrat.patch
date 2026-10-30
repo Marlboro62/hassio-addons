@@ -96,3 +96,16 @@ index b856190..367f2a7 100644
  
          # Détecter les trous dans la base locale (et redemander J-2/J-1 en quotidien, corrigés par Enedis)
          force_refresh_from = (
+diff --git a/apps/api/tests/unit/test_client_mode_pr110.py b/apps/api/tests/unit/test_client_mode_pr110.py
+index eb15110..61dde8f 100644
+--- a/apps/api/tests/unit/test_client_mode_pr110.py
++++ b/apps/api/tests/unit/test_client_mode_pr110.py
+@@ -55,6 +55,8 @@ def sync_service(db):
+     service = SyncService.__new__(SyncService)
+     service.db = db
+     service.adapter = MagicMock()
++    # Mise en service inconnue : fenêtre Enedis complète (borne de la PR #189)
++    service._activation_date = AsyncMock(return_value=None)
+     return service
+ 
+ 
