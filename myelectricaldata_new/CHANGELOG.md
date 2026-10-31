@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.12.1.5
+
+- Pages de l'interface : la page Consommation (et les autres) ne redemande plus à la passerelle les périodes antérieures à la mise en service du contrat (avertissements NO_DATA, quota consommé), comme la synchro depuis la 2.12.1.2. Correctif de la PR MyElectricalData/myelectricaldata_new#189 complétée.
+
 ## 2.12.1.4
 
 - Correctifs de l'add-on : tests unitaires de la synchro bornée à la mise en service du contrat mis à jour (605 tests réussis avec les 4 correctifs). Aucun changement de fonctionnement par rapport à la 2.12.1.3.
