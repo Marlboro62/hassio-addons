@@ -1,0 +1,268 @@
+diff --git a/apps/web/src/pages/ConsumptionEuro/hooks/useConsumptionEuroCalcs.ts b/apps/web/src/pages/ConsumptionEuro/hooks/useConsumptionEuroCalcs.ts
+index 55154a9..878c105 100644
+--- a/apps/web/src/pages/ConsumptionEuro/hooks/useConsumptionEuroCalcs.ts
++++ b/apps/web/src/pages/ConsumptionEuro/hooks/useConsumptionEuroCalcs.ts
+@@ -1,11 +1,11 @@
+ import { useMemo } from 'react'
+ import { useQuery, useQueryClient } from '@tanstack/react-query'
+-import { parseOffpeakHours, isOffpeakTime } from '@/utils/offpeakHours'
++import { parseOffpeakHours, offpeakFraction } from '@/utils/offpeakHours'
+ import { tempoApi, type TempoDay } from '@/api/tempo'
+ import type { EnergyOffer } from '@/api/energy'
+ import type { YearlyCost, MonthlyCost, SelectedOfferWithProvider } from '../types/euro.types'
+ import type { APIResponse, EnedisMeasure, MeasureReading, PDL } from '@/types/api'
+-import { getIntervalLength, getReadings, getUnit, hasReadings, readingEnergyWh } from '@/utils/enedisMeasure'
++import { getIntervalLength, getReadings, getUnit, hasReadings, readingEnergyWh, readingHours } from '@/utils/enedisMeasure'
+ 
+ interface UseConsumptionEuroCalcsProps {
+   selectedPDL: string | null
+@@ -157,7 +157,7 @@ export function useConsumptionEuroCalcs({
+       date: Date
+       dateKey: string // YYYY-MM-DD for tempo lookup
+       energyKwh: number
+-      isHC: boolean
++      hcShare: number // part du relevé en heures creuses (0 à 1, au prorata des minutes)
+     }> = []
+ 
+     allDetailQueries.forEach((query) => {
+@@ -187,13 +187,13 @@ export function useConsumptionEuroCalcs({
+ 
+         const hour = apiDateTime.getHours()
+         const minute = apiDateTime.getMinutes()
+-        const isHC = isOffpeakTime(hour, minute, offpeakRanges)
++        const hcShare = offpeakFraction(hour, minute, readingHours(reading, intervalLength) * 60, offpeakRanges)
+ 
+         allReadings.push({
+           date: apiDateTime,
+           dateKey,
+           energyKwh,
+-          isHC
++          hcShare
+         })
+       })
+     })
+@@ -201,7 +201,7 @@ export function useConsumptionEuroCalcs({
+     if (allReadings.length === 0) return []
+ 
+     // Remove duplicates
+-    const uniqueReadingsMap = new Map<string, { date: Date; dateKey: string; energyKwh: number; isHC: boolean }>()
++    const uniqueReadingsMap = new Map<string, { date: Date; dateKey: string; energyKwh: number; hcShare: number }>()
+     allReadings.forEach(reading => {
+       const key = reading.date.toISOString()
+       if (!uniqueReadingsMap.has(key)) {
+@@ -299,13 +299,12 @@ export function useConsumptionEuroCalcs({
+           }
+         }
+ 
+-        if (reading.isHC) {
+-          monthlyData[monthKey].hcKwh += reading.energyKwh
+-          monthlyData[monthKey].hcCost += reading.energyKwh * hcPrice
+-        } else {
+-          monthlyData[monthKey].hpKwh += reading.energyKwh
+-          monthlyData[monthKey].hpCost += reading.energyKwh * hpPrice
+-        }
++        const hcKwh = reading.energyKwh * reading.hcShare
++        const hpKwh = reading.energyKwh - hcKwh
++        monthlyData[monthKey].hcKwh += hcKwh
++        monthlyData[monthKey].hcCost += hcKwh * hcPrice
++        monthlyData[monthKey].hpKwh += hpKwh
++        monthlyData[monthKey].hpCost += hpKwh * hpPrice
+         monthlyData[monthKey].daysWithData.add(dayKey)
+       })
+ 
+diff --git a/apps/web/src/pages/ConsumptionKwh/components/HcHpDistribution.tsx b/apps/web/src/pages/ConsumptionKwh/components/HcHpDistribution.tsx
+index e72b4e9..2b0ff05 100644
+--- a/apps/web/src/pages/ConsumptionKwh/components/HcHpDistribution.tsx
++++ b/apps/web/src/pages/ConsumptionKwh/components/HcHpDistribution.tsx
+@@ -228,8 +228,8 @@ export function HcHpDistribution({ hcHpByYear, selectedPDLDetails }: HcHpDistrib
+                   Le total HC/HP peut différer légèrement de la "Consommation par années".
+                   Cette différence est due à une simulation basée sur les plages horaires HC/HP,
+                   car Enedis ne fournit pas ces données détaillées.
+-                  De plus, Enedis transmet les données par paliers de 30 minutes : si le changement d'heure creuse/pleine
+-                  intervient au milieu d'un intervalle de 30 minutes, la répartition HC/HP sera approximative à 30 minutes près.
++                  Enedis transmet les données par paliers de 30 minutes : quand le changement d'heure creuse/pleine
++                  intervient au milieu d'un intervalle, celui-ci est réparti au prorata des minutes passées en heures creuses.
+                   C'est la <strong>Consommation par années</strong> qui est la plus précise et qui sera facturée par votre fournisseur.
+                 </p>
+               </div>
+diff --git a/apps/web/src/pages/ConsumptionKwh/hooks/useConsumptionCalcs.ts b/apps/web/src/pages/ConsumptionKwh/hooks/useConsumptionCalcs.ts
+index 8735030..3bd27f0 100644
+--- a/apps/web/src/pages/ConsumptionKwh/hooks/useConsumptionCalcs.ts
++++ b/apps/web/src/pages/ConsumptionKwh/hooks/useConsumptionCalcs.ts
+@@ -1,6 +1,6 @@
+ import { useMemo, useEffect, useState } from 'react'
+ import { useQueryClient } from '@tanstack/react-query'
+-import { parseOffpeakHours, isOffpeakTime } from '@/utils/offpeakHours'
++import { parseOffpeakHours, offpeakFraction } from '@/utils/offpeakHours'
+ import { useDatePreferencesStore } from '@/stores/datePreferencesStore'
+ import { getIntervalLength, getReadings, getUnit, hasReadings, readingEnergyWh, readingHours } from '@/utils/enedisMeasure'
+ import type { MeasureReading } from '@/types/api'
+@@ -563,7 +563,7 @@ export function useConsumptionCalcs({
+       exact: false,
+     })
+ 
+-    const allReadings: Array<{ date: Date; energyKwh: number; isHC: boolean }> = []
++    const allReadings: Array<{ date: Date; energyKwh: number; hcShare: number }> = []
+ 
+     allDetailQueries.forEach((query) => {
+       const response = query.state.data as any
+@@ -588,12 +588,13 @@ export function useConsumptionCalcs({
+ 
+         const hour = apiDateTime.getHours()
+         const minute = apiDateTime.getMinutes()
+-        const isHC = isOffpeakTime(hour, minute, offpeakRanges)
++        // Part HC au prorata des minutes du créneau (plage HC qui commence ou finit dans le créneau)
++        const hcShare = offpeakFraction(hour, minute, readingHours(reading, intervalLength) * 60, offpeakRanges)
+ 
+         allReadings.push({
+           date: apiDateTime,
+           energyKwh,
+-          isHC
++          hcShare
+         })
+       })
+     })
+@@ -601,7 +602,7 @@ export function useConsumptionCalcs({
+     if (allReadings.length === 0) return []
+ 
+     // Remove duplicates by keeping only unique date/time combinations
+-    const uniqueReadingsMap = new Map<string, { date: Date; energyKwh: number; isHC: boolean }>()
++    const uniqueReadingsMap = new Map<string, { date: Date; energyKwh: number; hcShare: number }>()
+     allReadings.forEach(reading => {
+       const key = reading.date.toISOString()
+       if (!uniqueReadingsMap.has(key)) {
+@@ -624,8 +625,8 @@ export function useConsumptionCalcs({
+     const result = periods.map(period => {
+       const periodReadings = uniqueReadings.filter(r => r.date >= period.start && r.date <= period.end)
+ 
+-      const hcKwh = periodReadings.filter(r => r.isHC).reduce((sum, r) => sum + r.energyKwh, 0)
+-      const hpKwh = periodReadings.filter(r => !r.isHC).reduce((sum, r) => sum + r.energyKwh, 0)
++      const hcKwh = periodReadings.reduce((sum, r) => sum + r.energyKwh * r.hcShare, 0)
++      const hpKwh = periodReadings.reduce((sum, r) => sum + r.energyKwh * (1 - r.hcShare), 0)
+       const totalKwh = hcKwh + hpKwh
+ 
+       return {
+@@ -657,7 +658,7 @@ export function useConsumptionCalcs({
+     if (allDetailQueries.length === 0) return []
+ 
+ 
+-    const allReadings: Array<{ date: Date; energyKwh: number; isHC: boolean }> = []
++    const allReadings: Array<{ date: Date; energyKwh: number; hcShare: number }> = []
+ 
+     allDetailQueries.forEach((query) => {
+       const response = query.state.data as any
+@@ -678,16 +679,17 @@ export function useConsumptionCalcs({
+         const energyKwh = energyWh / 1000
+         const hour = apiDateTime.getHours()
+         const minute = apiDateTime.getMinutes()
+-        const isHC = isOffpeakTime(hour, minute, offpeakRanges)
++        // Part HC au prorata des minutes du créneau (plage HC qui commence ou finit dans le créneau)
++        const hcShare = offpeakFraction(hour, minute, readingHours(reading, intervalLength) * 60, offpeakRanges)
+ 
+-        allReadings.push({ date: apiDateTime, energyKwh, isHC })
++        allReadings.push({ date: apiDateTime, energyKwh, hcShare })
+       })
+     })
+ 
+     if (allReadings.length === 0) return []
+ 
+     // Remove duplicates by keeping only unique date/time combinations
+-    const uniqueReadingsMap = new Map<string, { date: Date; energyKwh: number; isHC: boolean }>()
++    const uniqueReadingsMap = new Map<string, { date: Date; energyKwh: number; hcShare: number }>()
+     allReadings.forEach(reading => {
+       const key = reading.date.toISOString()
+       if (!uniqueReadingsMap.has(key)) {
+@@ -727,11 +729,8 @@ export function useConsumptionCalcs({
+           }
+         }
+ 
+-        if (reading.isHC) {
+-          monthlyData[monthKey].hcKwh += reading.energyKwh
+-        } else {
+-          monthlyData[monthKey].hpKwh += reading.energyKwh
+-        }
++        monthlyData[monthKey].hcKwh += reading.energyKwh * reading.hcShare
++        monthlyData[monthKey].hpKwh += reading.energyKwh * (1 - reading.hcShare)
+       })
+ 
+       const months = Object.keys(monthlyData).sort().map(key => ({
+diff --git a/apps/web/src/utils/__tests__/offpeakHours.test.ts b/apps/web/src/utils/__tests__/offpeakHours.test.ts
+new file mode 100644
+index 0000000..2972808
+--- /dev/null
++++ b/apps/web/src/utils/__tests__/offpeakHours.test.ts
+@@ -0,0 +1,44 @@
++import { describe, expect, it } from 'vitest'
++import { isOffpeakTime, offpeakFraction, parseOffpeakHours } from '../offpeakHours'
++
++// Contrat dont les plages HC ne tombent pas sur la demi-heure (cas réel comparé au ZLinky)
++const DECALEES = parseOffpeakHours({ ranges: ['23:32-05:32', '14:32-16:32'] })
++const CALEES = parseOffpeakHours({ ranges: ['22:00-06:00'] })
++
++describe('offpeakFraction', () => {
++  it('répartit au prorata un créneau où commence une plage HC', () => {
++    // 23h30-0h00 : 28 minutes en HC sur 30
++    expect(offpeakFraction(23, 30, 30, DECALEES)).toBeCloseTo(28 / 30)
++  })
++
++  it('répartit au prorata un créneau où finit une plage HC', () => {
++    // 5h30-6h00 : 2 minutes en HC sur 30
++    expect(offpeakFraction(5, 30, 30, DECALEES)).toBeCloseTo(2 / 30)
++    // 16h30-17h00 : 2 minutes en HC
++    expect(offpeakFraction(16, 30, 30, DECALEES)).toBeCloseTo(2 / 30)
++  })
++
++  it('donne 0 ou 1 pour un créneau entièrement HP ou HC', () => {
++    expect(offpeakFraction(2, 0, 30, DECALEES)).toBe(1)
++    expect(offpeakFraction(10, 0, 30, DECALEES)).toBe(0)
++  })
++
++  it('donne le même résultat que isOffpeakTime pour des plages calées sur la demi-heure', () => {
++    for (let t = 0; t < 1440; t += 30) {
++      const hour = Math.floor(t / 60)
++      const minute = t % 60
++      expect(offpeakFraction(hour, minute, 30, CALEES)).toBe(isOffpeakTime(hour, minute, CALEES) ? 1 : 0)
++    }
++  })
++
++  it('suit le pas du relevé (15 minutes) et passe minuit', () => {
++    expect(offpeakFraction(23, 30, 15, DECALEES)).toBeCloseTo(13 / 15)
++    expect(offpeakFraction(23, 45, 30, CALEES)).toBe(1)
++  })
++
++  it('retrouve la journée du compteur : 6 h de HC sur 24 h', () => {
++    let hc = 0
++    for (let t = 0; t < 1440; t += 30) hc += offpeakFraction(Math.floor(t / 60), t % 60, 30, DECALEES) * 30
++    expect(hc).toBe(8 * 60)
++  })
++})
+diff --git a/apps/web/src/utils/offpeakHours.ts b/apps/web/src/utils/offpeakHours.ts
+index 2add6a7..3cf5783 100644
+--- a/apps/web/src/utils/offpeakHours.ts
++++ b/apps/web/src/utils/offpeakHours.ts
+@@ -78,6 +78,25 @@ export function isOffpeakTime(hour: number, minute: number, ranges: OffpeakRange
+   return false
+ }
+ 
++/**
++ * Part du créneau [hour:minute, +durationMinutes[ passée en heures creuses, entre 0 et 1.
++ *
++ * Une plage HC peut commencer ou finir au milieu d'un créneau de la courbe de charge (contrat en
++ * 23h32-5h32 par exemple) : classer tout le créneau d'après son heure de début décale la répartition
++ * HC / HP par rapport au compteur. Le créneau est donc réparti au prorata de ses minutes, comme dans
++ * les exports (backend). Une plage calée sur le pas donne 0 ou 1, comme isOffpeakTime.
++ */
++export function offpeakFraction(hour: number, minute: number, durationMinutes: number, ranges: OffpeakRange[]): number {
++  const duration = Math.max(1, Math.round(durationMinutes))
++  const start = hour * 60 + minute
++  let offpeakMinutes = 0
++  for (let i = 0; i < duration; i++) {
++    const t = (start + i) % 1440
++    if (isOffpeakTime(Math.floor(t / 60), t % 60, ranges)) offpeakMinutes++
++  }
++  return offpeakMinutes / duration
++}
++
+ /**
+  * Check if a given hour is in off-peak (simplified version for hour-only checks)
+  */
