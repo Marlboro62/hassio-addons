@@ -1,5 +1,97 @@
+diff --git a/apps/api/src/routers/enedis_client.py b/apps/api/src/routers/enedis_client.py
+index 5f79bca..eb83a72 100644
+--- a/apps/api/src/routers/enedis_client.py
++++ b/apps/api/src/routers/enedis_client.py
+@@ -30,7 +30,7 @@ from ..services.local_data import (
+     format_detail_response,
+     parse_max_power_points,
+ )
+-from ..services.sync import MAX_DAILY_DAYS, MAX_DETAILED_DAYS
++from ..services.sync import MAX_DAILY_DAYS, MAX_DETAILED_DAYS, get_activation_date
+ 
+ logger = logging.getLogger(__name__)
+ 
+@@ -64,6 +64,22 @@ def _within_gateway_window(ranges: list[tuple[date, date]], max_days: int) -> li
+     window_start = date.today() - timedelta(days=max_days)
+     return [(max(start, window_start), end) for start, end in ranges if end > window_start]
+ 
++async def _after_activation(
++    db: AsyncSession, usage_point_id: str, data_type: str, ranges: list[tuple[date, date]]
++) -> list[tuple[date, date]]:
++    """Plages manquantes coupées à la mise en service du contrat (fin exclue) : Enedis n'a rien avant (#188).
++
++    Sans cette borne, ouvrir la page Consommation redemande à la passerelle chaque semaine antérieure
++    au contrat (réponses NO_DATA, quota consommé pour rien), comme la synchro avant la même correction.
++    """
++    if not ranges:
++        return ranges
++    activation = await get_activation_date(db, usage_point_id, data_type)
++    if activation is None:
++        return ranges
++    return [(max(start, activation), end) for start, end in ranges if end > activation]
++
++
+ router = APIRouter(
+     prefix="/enedis",
+     tags=["Enedis Data (via Gateway)"],
+@@ -269,6 +285,7 @@ async def get_consumption_daily(
+             usage_point_id, start_date, end_date
+         )
+         missing_ranges = _within_gateway_window(missing_ranges, MAX_DAILY_DAYS)
++        missing_ranges = await _after_activation(db, usage_point_id, "consumption", missing_ranges)
+         all_readings.extend(local_data)
+ 
+         # If no missing ranges, return local data only
+@@ -370,6 +387,7 @@ async def get_consumption_detail(
+             usage_point_id, start_date, end_date
+         )
+         missing_ranges = _within_gateway_window(missing_ranges, MAX_DETAILED_DAYS)
++        missing_ranges = await _after_activation(db, usage_point_id, "consumption", missing_ranges)
+         all_readings.extend(local_data)
+ 
+         # If no missing ranges, return local data only
+@@ -440,6 +458,7 @@ async def _max_power_data(
+     local_service = LocalDataService(db)
+     points, missing_ranges = await local_service.get_max_power(usage_point_id, start_date, end_date)
+     missing_ranges = _within_gateway_window(missing_ranges, MAX_DAILY_DAYS)
++    missing_ranges = await _after_activation(db, usage_point_id, "consumption", missing_ranges)
+ 
+     if missing_ranges:
+         for range_start, range_end in missing_ranges:
+@@ -544,6 +563,7 @@ async def get_production_daily(
+             usage_point_id, start_date, end_date
+         )
+         missing_ranges = _within_gateway_window(missing_ranges, MAX_DAILY_DAYS)
++        missing_ranges = await _after_activation(db, usage_point_id, "production", missing_ranges)
+         all_readings.extend(local_data)
+ 
+         # If no missing ranges, return local data only
+@@ -645,6 +665,7 @@ async def get_production_detail(
+             usage_point_id, start_date, end_date
+         )
+         missing_ranges = _within_gateway_window(missing_ranges, MAX_DETAILED_DAYS)
++        missing_ranges = await _after_activation(db, usage_point_id, "production", missing_ranges)
+         all_readings.extend(local_data)
+ 
+         # If no missing ranges, return local data only
+@@ -792,6 +813,7 @@ async def get_consumption_detail_batch(
+                 usage_point_id, start_date, end_date
+             )
+             missing_ranges = _within_gateway_window(missing_ranges, MAX_DETAILED_DAYS)
++            missing_ranges = await _after_activation(db, usage_point_id, "consumption", missing_ranges)
+             all_readings.extend(local_data)
+ 
+             if not missing_ranges:
+@@ -916,6 +938,7 @@ async def get_production_detail_batch(
+                 usage_point_id, start_date, end_date
+             )
+             missing_ranges = _within_gateway_window(missing_ranges, MAX_DETAILED_DAYS)
++            missing_ranges = await _after_activation(db, usage_point_id, "production", missing_ranges)
+             all_readings.extend(local_data)
+ 
+             if not missing_ranges:
 diff --git a/apps/api/src/services/sync.py b/apps/api/src/services/sync.py
-index b856190..367f2a7 100644
+index b856190..6334b48 100644
 --- a/apps/api/src/services/sync.py
 +++ b/apps/api/src/services/sync.py
 @@ -51,6 +51,18 @@ DAILY_REFRESH_WINDOW_DAYS = 2
@@ -21,7 +113,33 @@ index b856190..367f2a7 100644
  def _normalize_utc(ts: datetime | None) -> datetime | None:
      if ts is None:
          return None
-@@ -136,6 +148,9 @@ class SyncService:
+@@ -88,6 +100,25 @@ _energy_sync_lock = asyncio.Lock()
+ _daily_upsert_effective: bool | None = None
+ 
+ 
++async def get_activation_date(db: AsyncSession, usage_point_id: str, data_type: str) -> date | None:
++    """Date de mise en service (consommation ou production) : Enedis n'a aucune donnée avant (#188).
++
++    Lue dans le contrat déjà synchronisé (synthese_contrat), sinon dans le PDL pour la consommation.
++    Sert à la synchro et aux lectures de l'interface (routers/enedis_client.py).
++    """
++    result = await db.execute(select(ContractData.raw_data).where(ContractData.usage_point_id == usage_point_id))
++    raw = result.scalar_one_or_none()
++    if isinstance(raw, dict):
++        key = "production_activation_date" if data_type == "production" else "activation_date"
++        activation = _parse_iso_date(parse_contract(raw).get(key))
++        if activation is not None:
++            return activation
++    if data_type == "production":
++        return None
++    result = await db.execute(select(PDL.activation_date).where(PDL.usage_point_id == usage_point_id))
++    return _parse_iso_date(result.scalar_one_or_none())
++
++
+ class SyncService:
+     """Service to sync data from MyElectricalData API to the local database (PostgreSQL or SQLite)"""
+ 
+@@ -136,6 +167,9 @@ class SyncService:
                      existing_pdl.has_consumption = remote_pdl.get("has_consumption", True)
                      existing_pdl.has_production = remote_pdl.get("has_production", False)
                      existing_pdl.is_active = remote_pdl.get("is_active", True)
@@ -31,7 +149,7 @@ index b856190..367f2a7 100644
                      # Parse offpeak_hours
                      offpeak = remote_pdl.get("offpeak_hours")
                      if isinstance(offpeak, dict):
-@@ -165,6 +180,7 @@ class SyncService:
+@@ -165,6 +199,7 @@ class SyncService:
                          has_consumption=remote_pdl.get("has_consumption", True),
                          has_production=remote_pdl.get("has_production", False),
                          is_active=remote_pdl.get("is_active", True),
@@ -39,28 +157,13 @@ index b856190..367f2a7 100644
                      )
                      self.db.add(new_pdl)
                      logger.info(f"[SYNC] Created new PDL: {usage_point_id} ({remote_pdl.get('name')})")
-@@ -564,6 +580,36 @@ class SyncService:
+@@ -564,6 +599,21 @@ class SyncService:
              model_class=ProductionData,
          )
  
 +    async def _activation_date(self, usage_point_id: str, data_type: str) -> date | None:
-+        """Date de mise en service (consommation ou production) : Enedis n'a aucune donnée avant (#188).
-+
-+        Lue dans le contrat déjà synchronisé (synthese_contrat), sinon dans le PDL pour la consommation.
-+        """
-+        result = await self.db.execute(
-+            select(ContractData.raw_data).where(ContractData.usage_point_id == usage_point_id)
-+        )
-+        raw = result.scalar_one_or_none()
-+        if isinstance(raw, dict):
-+            key = "production_activation_date" if data_type == "production" else "activation_date"
-+            activation = _parse_iso_date(parse_contract(raw).get(key))
-+            if activation is not None:
-+                return activation
-+        if data_type == "production":
-+            return None
-+        result = await self.db.execute(select(PDL.activation_date).where(PDL.usage_point_id == usage_point_id))
-+        return _parse_iso_date(result.scalar_one_or_none())
++        """Date de mise en service (consommation ou production) : Enedis n'a aucune donnée avant (#188)."""
++        return await get_activation_date(self.db, usage_point_id, data_type)
 +
 +    async def _sync_start(self, usage_point_id: str, data_type: str, window_start: date, end_date: date) -> date:
 +        """Début de la plage à synchroniser : la fenêtre Enedis, pas avant la mise en service du contrat.
@@ -76,7 +179,7 @@ index b856190..367f2a7 100644
      async def _find_missing_ranges(
          self,
          model_class: type[ConsumptionData | ProductionData],
-@@ -599,7 +645,9 @@ class SyncService:
+@@ -599,7 +649,9 @@ class SyncService:
  
          # [start_date, end_date[ avec end_date = today : J-1 inclus (Enedis refuse une fin à demain)
          end_date = date.today()
@@ -87,7 +190,7 @@ index b856190..367f2a7 100644
  
          result = await self.db.execute(
              select(func.distinct(MaxPowerData.date)).where(
-@@ -720,7 +768,7 @@ class SyncService:
+@@ -720,7 +772,7 @@ class SyncService:
  
          # Plage totale [start_date, end_date[ avec end_date = today : J-1 inclus
          end_date = date.today()
@@ -96,3 +199,223 @@ index b856190..367f2a7 100644
  
          # Détecter les trous dans la base locale (et redemander J-2/J-1 en quotidien, corrigés par Enedis)
          force_refresh_from = (
+diff --git a/apps/api/tests/unit/test_client_mode_pr110.py b/apps/api/tests/unit/test_client_mode_pr110.py
+index eb15110..56c27d8 100644
+--- a/apps/api/tests/unit/test_client_mode_pr110.py
++++ b/apps/api/tests/unit/test_client_mode_pr110.py
+@@ -55,6 +55,8 @@ def sync_service(db):
+     service = SyncService.__new__(SyncService)
+     service.db = db
+     service.adapter = MagicMock()
++    # Mise en service inconnue : fenêtre Enedis complète (borne testée dans test_sync_debut_contrat.py)
++    service._activation_date = AsyncMock(return_value=None)
+     return service
+ 
+ 
+@@ -274,6 +276,7 @@ async def test_max_power_complete_les_jours_manquants_puis_relit_la_base(monkeyp
+     monkeypatch.setattr(enedis_client, "LocalDataService", lambda db: service)
+     monkeypatch.setattr(enedis_client, "get_med_adapter", lambda: adapter)
+ 
++    monkeypatch.setattr(enedis_client, "get_activation_date", AsyncMock(return_value=None))
+     data = await enedis_client._max_power_data(MagicMock(), PRM, "2026-09-29", "2026-10-01", use_cache=True)
+ 
+     adapter.get_consumption_max_power.assert_awaited_once_with(PRM, "2026-09-29", "2026-10-01")
+diff --git a/apps/api/tests/unit/test_historique_complet.py b/apps/api/tests/unit/test_historique_complet.py
+index e9c466e..0639d17 100644
+--- a/apps/api/tests/unit/test_historique_complet.py
++++ b/apps/api/tests/unit/test_historique_complet.py
+@@ -28,6 +28,8 @@ def service(monkeypatch):
+     monkeypatch.setattr(enedis_client, "LocalDataService", lambda db: service)
+     monkeypatch.setattr(enedis_client, "verify_pdl_ownership", AsyncMock(return_value=True))
+     monkeypatch.setattr(enedis_client, "_detail_chunk_backoff", {})
++    # Mise en service inconnue : seule la fenêtre de la passerelle borne les plages (borne de la PR #189)
++    monkeypatch.setattr(enedis_client, "get_activation_date", AsyncMock(return_value=None))
+     return service
+ 
+ 
+diff --git a/apps/api/tests/unit/test_sync_debut_contrat.py b/apps/api/tests/unit/test_sync_debut_contrat.py
+new file mode 100644
+index 0000000..5143ed3
+--- /dev/null
++++ b/apps/api/tests/unit/test_sync_debut_contrat.py
+@@ -0,0 +1,180 @@
++"""Mode client : la synchro ne remonte pas avant la mise en service du contrat (issue #188)
++
++Enedis n'a aucune donnée avant la date de mise en service : sans borne, les semaines antérieures
++restaient « manquantes » et étaient redemandées à chaque synchro (NO_DATA, quota consommé pour rien).
++"""
++
++from collections.abc import AsyncIterator
++from datetime import date, timedelta
++from unittest.mock import AsyncMock, MagicMock
++
++import pytest
++from sqlalchemy import select
++from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
++
++import src.models  # noqa: F401  (enregistre tous les modèles)
++from src.models.base import Base
++from src.models.client_mode import ContractData
++from src.models.pdl import PDL
++from src.models.user import User
++from src.services.sync import SyncService
++
++PRM = "99999999999991"
++NO_DATA = {"success": False, "error": {"code": "NO_DATA", "message": "No consumption data available for this period"}}
++
++
++@pytest.fixture
++async def db() -> AsyncIterator[AsyncSession]:
++    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
++    async with engine.begin() as conn:
++        await conn.run_sync(Base.metadata.create_all)
++    async with async_sessionmaker(engine, expire_on_commit=False)() as session:
++        user = User(email="client@example.org", hashed_password="x", client_id="cid", client_secret="x")
++        session.add(user)
++        await session.flush()
++        session.add(PDL(usage_point_id=PRM, user_id=user.id))
++        await session.commit()
++        yield session
++    await engine.dispose()
++
++
++def make_service(db: AsyncSession) -> SyncService:
++    service = SyncService.__new__(SyncService)
++    service.db = db
++    service.adapter = MagicMock()
++    for name in ("get_consumption_detail", "get_consumption_daily", "get_production_daily", "get_consumption_max_power"):
++        setattr(service.adapter, name, AsyncMock(return_value=NO_DATA))
++    return service
++
++
++def contract(consumption: date | None = None, production: date | None = None) -> ContractData:
++    synthese = {}
++    if consumption:
++        synthese["consumption_last_activation_date"] = f"{consumption.isoformat()}T00:00:00+01:00"
++    if production:
++        synthese["generation_last_activation_date"] = f"{production.isoformat()}T00:00:00+01:00"
++    return ContractData(usage_point_id=PRM, raw_data={"situation_contrat": [], "synthese_contrat": synthese})
++
++
++def first_start(fetch: AsyncMock) -> date:
++    return min(date.fromisoformat(call.args[1]) for call in fetch.call_args_list)
++
++
++async def test_courbe_de_charge_bornee_a_la_mise_en_service(db: AsyncSession) -> None:
++    activation = date.today() - timedelta(days=30)
++    db.add(contract(consumption=activation))
++    await db.commit()
++    service = make_service(db)
++
++    await service._sync_consumption_detail(PRM)
++
++    fetch = service.adapter.get_consumption_detail
++    assert first_start(fetch) == activation
++    assert fetch.await_count == 5  # 30 jours par tranches de 7, au lieu d'une centaine sur 2 ans
++
++
++async def test_journalier_et_puissance_max_bornes_aussi(db: AsyncSession) -> None:
++    activation = date.today() - timedelta(days=100)
++    db.add(contract(consumption=activation))
++    await db.commit()
++    service = make_service(db)
++
++    await service._sync_consumption_daily(PRM)
++    await service._sync_consumption_max_power(PRM)
++
++    assert first_start(service.adapter.get_consumption_daily) == activation
++    assert first_start(service.adapter.get_consumption_max_power) == activation
++
++
++async def test_production_bornee_a_sa_propre_mise_en_service(db: AsyncSession) -> None:
++    production = date.today() - timedelta(days=60)
++    db.add(contract(consumption=date.today() - timedelta(days=2000), production=production))
++    await db.commit()
++    service = make_service(db)
++
++    await service._sync_production_daily(PRM)
++
++    assert first_start(service.adapter.get_production_daily) == production
++
++
++async def test_sans_date_connue_fenetre_complete(db: AsyncSession) -> None:
++    service = make_service(db)
++
++    await service._sync_consumption_detail(PRM)
++
++    assert first_start(service.adapter.get_consumption_detail) == date.today() - timedelta(days=730)
++
++
++async def test_mise_en_service_ancienne_sans_effet(db: AsyncSession) -> None:
++    db.add(contract(consumption=date(2014, 1, 22)))
++    await db.commit()
++    service = make_service(db)
++
++    await service._sync_consumption_daily(PRM)
++
++    assert first_start(service.adapter.get_consumption_daily) == date.today() - timedelta(days=1095)
++
++
++async def test_date_du_pdl_si_contrat_absent(db: AsyncSession) -> None:
++    activation = date.today() - timedelta(days=14)
++    pdl = (await db.execute(select(PDL))).scalar_one()
++    pdl.activation_date = activation
++    await db.commit()
++    service = make_service(db)
++
++    await service._sync_consumption_detail(PRM)
++
++    assert first_start(service.adapter.get_consumption_detail) == activation
++
++
++async def test_liste_des_pdl_recopie_la_mise_en_service(db: AsyncSession) -> None:
++    service = make_service(db)
++    # Liste /pdl de la passerelle (PDLResponse, champ activation_date)
++    service.adapter.get_usage_points = AsyncMock(
++        return_value={"usage_points": [{"usage_point_id": PRM, "activation_date": "2026-01-10"}]}
++    )
++
++    await service.sync_pdl_list((await db.execute(select(User))).scalar_one().id)
++
++    pdl = (await db.execute(select(PDL))).scalar_one()
++    await db.refresh(pdl)
++    assert pdl.activation_date == date(2026, 1, 10)
++
++
++# Lectures de l'interface (routers/enedis_client.py) : même borne que la synchro
++
++
++async def test_interface_ne_redemande_pas_avant_la_mise_en_service(db: AsyncSession) -> None:
++    from src.routers.enedis_client import _after_activation
++
++    activation = date.today() - timedelta(days=30)
++    db.add(contract(consumption=activation))
++    await db.commit()
++    before = (activation - timedelta(days=60), activation - timedelta(days=53))
++    spanning = (activation - timedelta(days=3), activation + timedelta(days=4))
++    after = (activation + timedelta(days=10), activation + timedelta(days=17))
++
++    ranges = await _after_activation(db, PRM, "consumption", [before, spanning, after])
++
++    assert ranges == [(activation, spanning[1]), after]
++
++
++async def test_interface_production_bornee_a_sa_propre_date(db: AsyncSession) -> None:
++    from src.routers.enedis_client import _after_activation
++
++    consumption, production = date.today() - timedelta(days=400), date.today() - timedelta(days=20)
++    db.add(contract(consumption=consumption, production=production))
++    await db.commit()
++    old = (date.today() - timedelta(days=100), date.today() - timedelta(days=93))
++
++    assert await _after_activation(db, PRM, "consumption", [old]) == [old]
++    assert await _after_activation(db, PRM, "production", [old]) == []
++
++
++async def test_interface_sans_date_connue_inchangee(db: AsyncSession) -> None:
++    from src.routers.enedis_client import _after_activation
++
++    old = (date.today() - timedelta(days=700), date.today() - timedelta(days=693))
++
++    assert await _after_activation(db, PRM, "consumption", [old]) == [old]
++    assert await _after_activation(db, PRM, "production", [old]) == [old]
