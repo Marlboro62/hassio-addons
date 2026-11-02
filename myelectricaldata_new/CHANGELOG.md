@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.14.1
+
+- Basé sur MyElectricalData 2.14.1 : [notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.14.1). Saisie des prix de son offre, synchro bornée à la mise en service et prorata HC/HP viennent maintenant de MyElectricalData (PR #179, #189, #193, #195 intégrées) : les correctifs de l’add-on correspondants sont retirés.
+
 ## 2.12.1.6
 
 - Pages Consommation (kWh et €) : répartition HC/HP au prorata des minutes quand une plage d'heures creuses commence ou finit au milieu d'un créneau de 30 minutes (plages en xxh32 par exemple), comme les capteurs Home Assistant et le tableau Énergie depuis la 2.12.1.3. La répartition retrouve celle du compteur. Correctif de la PR MyElectricalData/myelectricaldata_new#195.
