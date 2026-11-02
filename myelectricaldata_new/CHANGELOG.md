@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.14.1
+
+Basé sur MyElectricalData 2.14.1 ([notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.14.1), de la 2.12.3 à la 2.14.1).
+
+- Nouveaux capteurs Home Assistant : coûts, puissance maximale et capteur binaire de dépassement de la puissance souscrite. Le coût total est aussi importé en statistique externe pour le tableau Énergie.
+- Interface sur téléphone : menu déroulant qui défile, titres et plages d'heures creuses mieux mis en page sur petit écran.
+- Base SQLite : correction de la détection des jours manquants (issue amont #192).
+- Contributions : la liste des contributions en attente renvoie les variantes de puissance.
+- Ces fonctions de l'add-on font maintenant partie de MyElectricalData : saisie des prix de son offre (l'option tarifaire suit l'offre saisie), synchro et pages bornées à la mise en service du contrat, répartition HC/HP au prorata des minutes (capteurs, statistiques et pages Consommation), format V1 d'EcoWatt et Tempo pour l'ancienne content-card-linky (PR amont #179, #189, #191, #193 et #195). Les correctifs correspondants de l'add-on sont retirés, et seul celui de l'accès par le panneau latéral (Ingress) reste.
+
 ## 2.12.1.6
 
 - Pages Consommation (kWh et €) : répartition HC/HP au prorata des minutes quand une plage d'heures creuses commence ou finit au milieu d'un créneau de 30 minutes (plages en xxh32 par exemple), comme les capteurs Home Assistant et le tableau Énergie depuis la 2.12.1.3. La répartition retrouve celle du compteur. Correctif de la PR MyElectricalData/myelectricaldata_new#195.
