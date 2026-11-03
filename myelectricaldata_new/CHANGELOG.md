@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.14.2
+
+- Basé sur MyElectricalData 2.14.2 : bilan et pages Consommation/Production corrigés pour les PDL partagés ; en mode client, l'interface n'appelle plus l'endpoint d'administration /admin/shared-pdls (réservé au mode serveur). [Notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.14.2).
+
 ## 2.14.1
 
 Basé sur MyElectricalData 2.14.1 ([notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.14.1), de la 2.12.3 à la 2.14.1).
