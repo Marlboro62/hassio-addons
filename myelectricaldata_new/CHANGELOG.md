@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.15.1
+
+- Basé sur MyElectricalData 2.15.1 : [notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.15.1).
+
 ## 2.15.0
 
 Basé sur MyElectricalData 2.15.0 ([notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.15.0)) : les PDL partagés arrivent dans le mode client.
