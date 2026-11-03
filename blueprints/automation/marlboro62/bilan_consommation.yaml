@@ -10,7 +10,7 @@ blueprint:
     cours comparée à la même période de l'année précédente.
 
 
-    Chaque comparaison donne l'écart en kWh et en %. Pour recevoir les deux bilans tout de suite,
+    Chaque comparaison donne l'écart en kWh et en %. Pour recevoir les deux bilans tout de suite,
     lancez l'automatisation à la main (⋮ → Exécuter).
 
 
@@ -189,13 +189,13 @@ actions:
           ecart: >-
             {% set c, p = semaine.cur, semaine.prev %}
             {% if semaine.cur_n == 0 or semaine.prev_n == 0 or p == 0 %}comparaison impossible (données manquantes)
-            {%- else %}{% set e = c - p %}{{ '+' if e > 0 else '−' if e < 0 else '' }}{{ '%.1f' | format(e | abs) | replace('.', ',') }} kWh ({{ '+' if e > 0 else '−' if e < 0 else '' }}{{ '%.1f' | format((e / p * 100) | abs) | replace('.', ',') }} %) {{ '↑' if e > 0 else '↓' if e < 0 else '=' }}{% endif %}
+            {%- else %}{% set e = c - p %}{{ '+' if e > 0 else '−' if e < 0 else '' }}{{ '%.1f' | format(e | abs) | replace('.', ',') }} kWh ({{ '+' if e > 0 else '−' if e < 0 else '' }}{{ '%.1f' | format((e / p * 100) | abs) | replace('.', ',') }} %) {{ '↑' if e > 0 else '↓' if e < 0 else '=' }}{% endif %}
           manque: >-
             {% set m = (7 - semaine.cur_n) + (7 - semaine.prev_n) %}{{ ('(' ~ m ~ ' jour' ~ ('s' if m > 1 else '') ~ ' sans données Enedis, non comptés)') if m > 0 else '' }}
           texte: >-
-            Semaine {{ periode }} : {{ '%.1f' | format(semaine.cur) | replace('.', ',') }} kWh
+            Semaine {{ periode }} : {{ '%.1f' | format(semaine.cur) | replace('.', ',') }} kWh
 
-            Semaine précédente : {{ '%.1f' | format(semaine.prev) | replace('.', ',') }} kWh
+            Semaine précédente : {{ '%.1f' | format(semaine.prev) | replace('.', ',') }} kWh
 
             Écart : {{ ecart }}{% if manque %}
 
@@ -207,8 +207,8 @@ actions:
           data: >-
             {% if html %}{{ {'html': '<h3>Consommation de la semaine</h3><p>Semaine ' ~ periode ~ '</p>'
               ~ '<table cellpadding=6 style=border-collapse:collapse>'
-              ~ '<tr><td>Semaine écoulée</td><td align=right><b>' ~ ('%.1f' | format(semaine.cur) | replace('.', ',')) ~ ' kWh</b></td></tr>'
-              ~ '<tr><td>Semaine précédente</td><td align=right>' ~ ('%.1f' | format(semaine.prev) | replace('.', ',')) ~ ' kWh</td></tr>'
+              ~ '<tr><td>Semaine écoulée</td><td align=right><b>' ~ ('%.1f' | format(semaine.cur) | replace('.', ',')) ~ ' kWh</b></td></tr>'
+              ~ '<tr><td>Semaine précédente</td><td align=right>' ~ ('%.1f' | format(semaine.prev) | replace('.', ',')) ~ ' kWh</td></tr>'
               ~ '<tr><td>Écart</td><td align=right>' ~ ecart ~ '</td></tr></table>'
               ~ ('<p><small>' ~ manque ~ '</small></p>' if manque else '')} }}{% else %}{{ {} }}{% endif %}
   - if:
@@ -227,12 +227,12 @@ actions:
           ligne: >-
             {% macro l(c, p) -%}
             {%- if c < 0 or p <= 0 -%}comparaison impossible (données manquantes)
-            {%- else -%}{%- set e = c - p -%}{{ '+' if e > 0 else '−' if e < 0 else '' }}{{ '%.0f' | format(e | abs) }} kWh ({{ '+' if e > 0 else '−' if e < 0 else '' }}{{ '%.1f' | format((e / p * 100) | abs) | replace('.', ',') }} %) {{ '↑' if e > 0 else '↓' if e < 0 else '=' }}
+            {%- else -%}{%- set e = c - p -%}{{ '+' if e > 0 else '−' if e < 0 else '' }}{{ '%.0f' | format(e | abs) }} kWh ({{ '+' if e > 0 else '−' if e < 0 else '' }}{{ '%.1f' | format((e / p * 100) | abs) | replace('.', ',') }} %) {{ '↑' if e > 0 else '↓' if e < 0 else '=' }}
             {%- endif -%}
             {%- endmacro %}
             {{ {'mois': l(annee.lm, annee.lm_ly), 'annee': l(annee.cy, annee.cy_ly)} }}
           kwh: >-
-            {% macro k(v) -%}{{ '—' if v < 0 else ('{:,.0f}'.format(v) | replace(',', ' ')) ~ ' kWh' }}{%- endmacro %}
+            {% macro k(v) -%}{{ '—' if v < 0 else ('{:,.0f}'.format(v) | replace(',', ' ')) ~ ' kWh' }}{%- endmacro %}
             {{ {'lm': k(annee.lm), 'lm_ly': k(annee.lm_ly), 'cy': k(annee.cy), 'cy_ly': k(annee.cy_ly)} }}
           texte: >-
             {{ nom_mois | capitalize }} {{ pm.an }} : {{ kwh.lm }}
