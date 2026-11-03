@@ -2,7 +2,19 @@
 
 ## 2.15.0
 
-- Basé sur MyElectricalData 2.15.0 : [notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.15.0).
+Basé sur MyElectricalData 2.15.0 ([notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.15.0)) : les PDL partagés arrivent dans le mode client.
+
+**Nouveautés**
+
+- PDL partagés : choix, PDL par PDL, des PDL partagés avec vous à suivre dans l'add-on.
+- Synchronisation des PDL partagés choisis, et purge de leurs données quand le partage est retiré.
+- Les données des PDL partagés passent par la passerelle au nom de leur propriétaire (nouveau modèle et migration de la base : faites une sauvegarde avant la mise à jour).
+
+**Corrections**
+
+- Liaison consommation / production recopiée pour les PDL partagés.
+- Corrections de la synchronisation des PDL partagés après relecture.
+- Accès d'administration accepté pour les comptes listés dans ADMIN_EMAILS (mode serveur).
 
 ## 2.14.2
 
