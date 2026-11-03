@@ -65,6 +65,28 @@ jobs:
                   - action: switch.turn_on
                     target:
                       entity_id: switch.chauffe_eau
+          - id: bilan_defaut
+            alias: Bilan, réglages par défaut
+            use_blueprint:
+              path: marlboro62/bilan_consommation.yaml
+              input:
+                consumption: sensor.linky_12345678901234_consumption
+                notify_action: notify.mobile_app_telephone
+          - id: bilan_complet
+            alias: Bilan, toutes les options
+            use_blueprint:
+              path: marlboro62/bilan_consommation.yaml
+              input:
+                consumption: sensor.linky_12345678901234_consumption
+                label: Maison
+                notify_action: notify.email_bilan
+                html: true
+                weekly: true
+                weekly_day: "1"
+                weekly_time: "09:30:00"
+                monthly: true
+                monthly_day: 3
+                monthly_time: "11:00:00"
           EOF
 
       - name: Vérifier avec Home Assistant
@@ -77,9 +99,10 @@ jobs:
             exit 1
           fi
           # Les deux automatisations doivent avoir été réellement chargées depuis le blueprint
-          for alias in "Tempo, réglages par défaut" "Tempo, toutes les options"; do
+          for alias in "Tempo, réglages par défaut" "Tempo, toutes les options" "Bilan, réglages par défaut" "Bilan, toutes les options"; do
             grep -qF "$alias" check.log || { echo "::error::Automatisation « $alias » absente du résultat"; exit 1; }
           done
           # Les actions fournies en entrée doivent se retrouver dans l'automatisation construite
           grep -qF "switch.chauffe_eau" check.log || { echo "::error::Entrées du blueprint non appliquées"; exit 1; }
+          grep -qF "notify.email_bilan" check.log || { echo "::error::Entrées du blueprint Bilan non appliquées"; exit 1; }
           grep -qF "Successful config" check.log || { echo "::error::check_config n'a pas abouti"; exit 1; }

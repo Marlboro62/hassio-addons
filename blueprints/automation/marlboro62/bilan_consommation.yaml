@@ -1,0 +1,263 @@
+blueprint:
+  name: "Bilan de consommation par semaine et par mois (MyElectricalData new)"
+  description: >-
+    Envoie un **bilan de consommation d'électricité** par e-mail ou par notification :
+
+
+    - **chaque semaine** : la semaine écoulée (du lundi au dimanche) comparée à la semaine précédente ;
+
+    - **chaque mois** : le mois écoulé comparé au même mois de l'année précédente, et l'année en
+    cours comparée à la même période de l'année précédente.
+
+
+    Chaque comparaison donne l'écart en kWh et en %. Pour recevoir les deux bilans tout de suite,
+    lancez l'automatisation à la main (⋮ → Exécuter).
+
+
+    Utilise le capteur de consommation créé par l'export Home Assistant de
+    [MyElectricalData new](https://github.com/MyElectricalData/myelectricaldata_new) (mode client),
+    `sensor.linky_<pdl>_consumption`.
+
+
+    Blueprint non officiel :
+    [documentation](https://github.com/Marlboro62/hassio-addons/tree/master/blueprints).
+  domain: automation
+  author: Marlboro62
+  homeassistant:
+    min_version: "2024.10.0"
+  source_url: https://github.com/Marlboro62/hassio-addons/blob/master/blueprints/automation/marlboro62/bilan_consommation.yaml
+  input:
+    capteur:
+      name: Compteur
+      icon: mdi:flash
+      input:
+        consumption:
+          name: Consommation Linky
+          description: Capteur de consommation de l'export MyElectricalData, sensor.linky_<pdl>_consumption.
+          selector:
+            entity:
+              domain: sensor
+        label:
+          name: Nom du compteur
+          description: Affiché dans le titre des messages, par exemple « Maison ». Laissez vide pour ne rien afficher.
+          default: ""
+          selector:
+            text:
+    envoi:
+      name: Envoi
+      icon: mdi:email-fast
+      input:
+        notify_action:
+          name: Action de notification
+          description: >-
+            Action notify qui envoie le message : un e-mail (par exemple notify.email, si un service
+            d'e-mail est configuré) ou une notification sur le téléphone (notify.mobile_app_mon_telephone).
+            Voir Outils de développement → Actions, en tapant « notify ».
+          selector:
+            text:
+        html:
+          name: Mise en forme HTML
+          description: >-
+            Ajoute une version HTML du bilan (tableau) pour les services d'e-mail qui l'acceptent
+            (comme l'intégration SMTP). Laissez désactivé pour une notification sur le téléphone.
+          default: false
+          selector:
+            boolean:
+    semaine:
+      name: Bilan de la semaine
+      icon: mdi:calendar-week
+      input:
+        weekly:
+          name: Envoyer le bilan de la semaine
+          default: true
+          selector:
+            boolean:
+        weekly_day:
+          name: Jour d'envoi
+          description: >-
+            Le bilan porte toujours sur la dernière semaine complète, du lundi au dimanche. Enedis
+            publie les données du dimanche le lundi matin : envoi le lundi par défaut.
+          default: "0"
+          selector:
+            select:
+              options:
+                - label: Lundi
+                  value: "0"
+                - label: Mardi
+                  value: "1"
+                - label: Mercredi
+                  value: "2"
+        weekly_time:
+          name: Heure d'envoi
+          default: "10:00:00"
+          selector:
+            time:
+    mois:
+      name: Bilan du mois et de l'année
+      icon: mdi:calendar-month
+      input:
+        monthly:
+          name: Envoyer le bilan du mois
+          default: true
+          selector:
+            boolean:
+        monthly_day:
+          name: Jour du mois
+          description: "Les données du dernier jour du mois arrivent le 1er au matin : envoi le 2 par défaut."
+          default: 2
+          selector:
+            number:
+              min: 1
+              max: 10
+              mode: box
+        monthly_time:
+          name: Heure d'envoi
+          default: "10:00:00"
+          selector:
+            time:
+
+mode: queued
+max: 3
+
+triggers:
+  - trigger: time
+    id: semaine
+    at: !input weekly_time
+  - trigger: time
+    id: mois
+    at: !input monthly_time
+
+variables:
+  consumption: !input consumption
+  label: !input label
+  notify_action: !input notify_action
+  html: !input html
+  weekly: !input weekly
+  weekly_day: !input weekly_day
+  monthly: !input monthly
+  monthly_day: !input monthly_day
+  manual: "{{ trigger is not defined or trigger.platform is none or trigger.id not in ['semaine', 'mois'] }}"
+  send_week: >-
+    {{ weekly and (manual or (trigger.id == 'semaine' and now().weekday() == weekly_day | int)) }}
+  send_month: "{{ monthly and (manual or (trigger.id == 'mois' and now().day == monthly_day | int)) }}"
+  # préfixe du titre : un modèle se termine sans espace (Home Assistant retire les espaces de fin)
+  titre: "{{ ('⚡ ' ~ label ~ ' ·') if label else '⚡' }}"
+  mois_fr: [janvier, février, mars, avril, mai, juin, juillet, août, septembre, octobre, novembre, décembre]
+  jours_fr: [lundi, mardi, mercredi, jeudi, vendredi, samedi, dimanche]
+  # Semaine complète la plus récente (lundi → dimanche) et la précédente, depuis l'historique
+  # quotidien du capteur (attributs daily et dailyweek, du plus récent au plus ancien ; -1 = jour manquant)
+  semaine: >-
+    {% set a = states[consumption].attributes if states[consumption] is defined else {} %}
+    {% set dates = a.dailyweek.split(',') if a.dailyweek is string else (a.dailyweek or []) %}
+    {% set vals = a.daily if a.daily is sequence and a.daily is not string else (a.daily | default('') | string).split(',') %}
+    {% set ns = namespace(m={}) %}
+    {% for d in dates %}
+      {% set v = vals[loop.index0] | float(-1) if loop.index0 < vals | count else -1 %}
+      {% if v >= 0 %}{% set ns.m = dict(ns.m, **{(d | string)[:10]: v}) %}{% endif %}
+    {% endfor %}
+    {% set today = now().date() %}
+    {% set lundi = today - timedelta(days=today.weekday() + 7) %}
+    {% set w = namespace(cur=0, prev=0, cur_n=0, prev_n=0) %}
+    {% for i in range(7) %}
+      {% set k1 = (lundi + timedelta(days=i)).isoformat() %}
+      {% set k0 = (lundi + timedelta(days=i - 7)).isoformat() %}
+      {% if k1 in ns.m %}{% set w.cur = w.cur + ns.m[k1] %}{% set w.cur_n = w.cur_n + 1 %}{% endif %}
+      {% if k0 in ns.m %}{% set w.prev = w.prev + ns.m[k0] %}{% set w.prev_n = w.prev_n + 1 %}{% endif %}
+    {% endfor %}
+    {{ {'debut': lundi.isoformat(), 'fin': (lundi + timedelta(days=6)).isoformat(),
+        'cur': w.cur | round(2), 'prev': w.prev | round(2), 'cur_n': w.cur_n, 'prev_n': w.prev_n} }}
+  annee: >-
+    {% set a = states[consumption].attributes if states[consumption] is defined else {} %}
+    {{ {'lm': a.last_month | float(-1), 'lm_ly': a.last_month_last_year | float(-1),
+        'cy': a.current_year | float(-1), 'cy_ly': a.current_year_last_year | float(-1)} }}
+
+conditions:
+  - condition: template
+    value_template: "{{ send_week or send_month }}"
+  - condition: template
+    value_template: "{{ states(consumption) not in ['unknown', 'unavailable', 'none'] and notify_action | trim != '' }}"
+
+actions:
+  - if:
+      - condition: template
+        value_template: "{{ send_week }}"
+    then:
+      - variables:
+          periode: >-
+            {% set d1 = as_datetime(semaine.debut) %}{% set d2 = as_datetime(semaine.fin) %}
+            du lundi {{ d1.day }}{{ 'er' if d1.day == 1 else '' }} {{ mois_fr[d1.month - 1] }} au dimanche {{ d2.day }}{{ 'er' if d2.day == 1 else '' }} {{ mois_fr[d2.month - 1] }} {{ d2.year }}
+          ecart: >-
+            {% set c, p = semaine.cur, semaine.prev %}
+            {% if semaine.cur_n == 0 or semaine.prev_n == 0 or p == 0 %}comparaison impossible (données manquantes)
+            {%- else %}{% set e = c - p %}{{ '+' if e > 0 else '−' if e < 0 else '' }}{{ '%.1f' | format(e | abs) | replace('.', ',') }} kWh ({{ '+' if e > 0 else '−' if e < 0 else '' }}{{ '%.1f' | format((e / p * 100) | abs) | replace('.', ',') }} %) {{ '↑' if e > 0 else '↓' if e < 0 else '=' }}{% endif %}
+          manque: >-
+            {% set m = (7 - semaine.cur_n) + (7 - semaine.prev_n) %}{{ ('(' ~ m ~ ' jour' ~ ('s' if m > 1 else '') ~ ' sans données Enedis, non comptés)') if m > 0 else '' }}
+          texte: >-
+            Semaine {{ periode }} : {{ '%.1f' | format(semaine.cur) | replace('.', ',') }} kWh
+
+            Semaine précédente : {{ '%.1f' | format(semaine.prev) | replace('.', ',') }} kWh
+
+            Écart : {{ ecart }}{% if manque %}
+
+            {{ manque }}{% endif %}
+      - action: !input notify_action
+        data:
+          title: "{{ titre }} Consommation de la semaine"
+          message: "{{ texte }}"
+          data: >-
+            {% if html %}{{ {'html': '<h3>Consommation de la semaine</h3><p>Semaine ' ~ periode ~ '</p>'
+              ~ '<table cellpadding=6 style=border-collapse:collapse>'
+              ~ '<tr><td>Semaine écoulée</td><td align=right><b>' ~ ('%.1f' | format(semaine.cur) | replace('.', ',')) ~ ' kWh</b></td></tr>'
+              ~ '<tr><td>Semaine précédente</td><td align=right>' ~ ('%.1f' | format(semaine.prev) | replace('.', ',')) ~ ' kWh</td></tr>'
+              ~ '<tr><td>Écart</td><td align=right>' ~ ecart ~ '</td></tr></table>'
+              ~ ('<p><small>' ~ manque ~ '</small></p>' if manque else '')} }}{% else %}{{ {} }}{% endif %}
+  - if:
+      - condition: template
+        value_template: "{{ send_month }}"
+    then:
+      - variables:
+          # mois écoulé et veille (dernier jour compté dans l'année en cours), en nombres
+          pm: >-
+            {% set d = now().replace(day=1) - timedelta(days=1) %}{{ {'mois': d.month, 'an': d.year} }}
+          veille: >-
+            {% set d = now() - timedelta(days=1) %}{{ {'jour': d.day, 'mois': d.month, 'an': d.year} }}
+          nom_mois: "{{ mois_fr[pm.mois - 1] }}"
+          de_mois: "{{ ('d’' if mois_fr[pm.mois - 1][0] in 'aeiouéè' else 'de ') ~ mois_fr[pm.mois - 1] }}"
+          jour_veille: "{{ veille.jour ~ ('er' if veille.jour == 1 else '') }}"
+          ligne: >-
+            {% macro l(c, p) -%}
+            {%- if c < 0 or p <= 0 -%}comparaison impossible (données manquantes)
+            {%- else -%}{%- set e = c - p -%}{{ '+' if e > 0 else '−' if e < 0 else '' }}{{ '%.0f' | format(e | abs) }} kWh ({{ '+' if e > 0 else '−' if e < 0 else '' }}{{ '%.1f' | format((e / p * 100) | abs) | replace('.', ',') }} %) {{ '↑' if e > 0 else '↓' if e < 0 else '=' }}
+            {%- endif -%}
+            {%- endmacro %}
+            {{ {'mois': l(annee.lm, annee.lm_ly), 'annee': l(annee.cy, annee.cy_ly)} }}
+          kwh: >-
+            {% macro k(v) -%}{{ '—' if v < 0 else ('{:,.0f}'.format(v) | replace(',', ' ')) ~ ' kWh' }}{%- endmacro %}
+            {{ {'lm': k(annee.lm), 'lm_ly': k(annee.lm_ly), 'cy': k(annee.cy), 'cy_ly': k(annee.cy_ly)} }}
+          texte: >-
+            {{ nom_mois | capitalize }} {{ pm.an }} : {{ kwh.lm }}
+
+            {{ nom_mois | capitalize }} {{ pm.an - 1 }} : {{ kwh.lm_ly }}
+
+            Écart : {{ ligne.mois }}
+
+
+            Année {{ veille.an }}, du 1er janvier au {{ jour_veille }} {{ mois_fr[veille.mois - 1] }} : {{ kwh.cy }}
+
+            Même période {{ veille.an - 1 }} : {{ kwh.cy_ly }}
+
+            Écart : {{ ligne.annee }}
+      - action: !input notify_action
+        data:
+          title: "{{ titre }} Consommation {{ de_mois }} {{ pm.an }}"
+          message: "{{ texte }}"
+          data: >-
+            {% if html %}{{ {'html': '<h3>Consommation ' ~ de_mois ~ ' ' ~ pm.an ~ '</h3>'
+              ~ '<table cellpadding=6 style=border-collapse:collapse>'
+              ~ '<tr><td>' ~ nom_mois | capitalize ~ ' ' ~ pm.an ~ '</td><td align=right><b>' ~ kwh.lm ~ '</b></td></tr>'
+              ~ '<tr><td>' ~ nom_mois | capitalize ~ ' ' ~ (pm.an - 1) ~ '</td><td align=right>' ~ kwh.lm_ly ~ '</td></tr>'
+              ~ '<tr><td>Écart</td><td align=right>' ~ ligne.mois ~ '</td></tr>'
+              ~ '<tr><td colspan=2>&nbsp;</td></tr>'
+              ~ '<tr><td>Année ' ~ veille.an ~ ' (au ' ~ jour_veille ~ ' ' ~ mois_fr[veille.mois - 1] ~ ')</td><td align=right><b>' ~ kwh.cy ~ '</b></td></tr>'
+              ~ '<tr><td>Même période ' ~ (veille.an - 1) ~ '</td><td align=right>' ~ kwh.cy_ly ~ '</td></tr>'
+              ~ '<tr><td>Écart</td><td align=right>' ~ ligne.annee ~ '</td></tr></table>'} }}{% else %}{{ {} }}{% endif %}
