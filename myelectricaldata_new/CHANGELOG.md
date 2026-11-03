@@ -2,7 +2,14 @@
 
 ## 2.15.1
 
-- Basé sur MyElectricalData 2.15.1 : [notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.15.1).
+Basé sur MyElectricalData 2.15.1 ([notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.15.1)) : correction des doublons de relevés quotidiens.
+
+**Corrections**
+
+- Une seule ligne par jour pour les relevés quotidiens : en cas de doublon, la plus récente est gardée.
+- Migration de la base : purge des doublons quotidiens existants et index unique partiel sous PostgreSQL < 15 (faites une sauvegarde avant la mise à jour).
+- L'écriture quotidienne ne crée plus de doublon sous PostgreSQL < 15.
+- Import des données V1 et tests de doublons compatibles avec PostgreSQL 14.
 
 ## 2.15.0
 
