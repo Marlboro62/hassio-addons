@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.15.1.1
+
+- Démarrage après la restauration d'une sauvegarde : les droits des fichiers PostgreSQL (base et journal) sont rendus automatiquement à l'utilisateur postgres, et le verrou laissé par un arrêt brutal est supprimé. Corrige « cannot create /data/pglog/postgres.log: Permission denied ».
+
 ## 2.15.1
 
 - Basé sur MyElectricalData 2.15.1 : [notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.15.1).
