@@ -32,7 +32,19 @@ PGPASS=$(cat /data/pg_password)
 # --- PostgreSQL ---
 mkdir -p /run/postgresql "$PGDATA" /data/pglog
 chown postgres:postgres /run/postgresql "$PGDATA" /data/pglog
+# Après la restauration d'une sauvegarde, les fichiers de la base et du journal peuvent appartenir
+# à root : PostgreSQL refuse alors de démarrer. On rend tout à l'utilisateur postgres.
+if [ -n "$(find "$PGDATA" /data/pglog ! -user postgres -print -quit 2>/dev/null)" ]; then
+  log "Droits des fichiers PostgreSQL corrigés (fichiers n'appartenant pas à postgres, ex. après une restauration)"
+  chown -R postgres:postgres "$PGDATA" /data/pglog
+fi
 chmod 700 "$PGDATA"
+# Fichier de verrou laissé par un arrêt brutal (plantage, restauration) : aucun PostgreSQL ne tourne ici
+PG_PID=$(head -n 1 "$PGDATA/postmaster.pid" 2>/dev/null || true)
+if [ -n "$PG_PID" ] && [ "$(cat "/proc/$PG_PID/comm" 2>/dev/null)" != "postgres" ]; then
+  log "Verrou PostgreSQL d'un arrêt précédent supprimé"
+  rm -f "$PGDATA/postmaster.pid"
+fi
 if [ ! -s "$PGDATA/PG_VERSION" ]; then
   log "Initialisation de PostgreSQL..."
   runuser -u postgres -- "$PG_BIN/initdb" -D "$PGDATA" -U postgres -E UTF8 \
