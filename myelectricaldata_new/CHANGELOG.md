@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.15.1.2
+
+- Démarrage après la restauration d'une sauvegarde : les droits des fichiers PostgreSQL (base et journal) sont rendus automatiquement à l'utilisateur postgres, et le verrou laissé par un arrêt brutal est supprimé. Corrige « cannot create /data/pglog/postgres.log: Permission denied ». (La 2.15.1.1 ne contenait pas encore la correction.)
+
 ## 2.15.1.1
 
 - Démarrage après la restauration d'une sauvegarde : les droits des fichiers PostgreSQL (base et journal) sont rendus automatiquement à l'utilisateur postgres, et le verrou laissé par un arrêt brutal est supprimé. Corrige « cannot create /data/pglog/postgres.log: Permission denied ».
