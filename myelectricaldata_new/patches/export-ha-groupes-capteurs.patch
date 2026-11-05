@@ -1,0 +1,340 @@
+diff --git a/apps/api/src/routers/export.py b/apps/api/src/routers/export.py
+index 21e51fb..5ab71f9 100644
+--- a/apps/api/src/routers/export.py
++++ b/apps/api/src/routers/export.py
+@@ -54,6 +54,19 @@ class HomeAssistantConfig(BaseModel):
+         default="fr",
+         description="Display language of entity names: fr (default) or en (historical names). Only names change, never entity_id",
+     )
++    # Groupes de capteurs facultatifs (issue #209) : false = entités non créées et retirées de Home Assistant
++    export_rte_tempo: bool = Field(
++        default=True,
++        description="Export RTE Tempo sensors (tempo_today, tempo_tomorrow). False removes them from Home Assistant",
++    )
++    export_edf_tempo: bool = Field(
++        default=True,
++        description="Export EDF Tempo sensors (tempo_info, tempo_days_*, tempo_price_*). False removes them from Home Assistant",
++    )
++    export_zen_flex: bool = Field(
++        default=True,
++        description="Export EDF Zen Flex sensors (zen_flex_today, zen_flex_tomorrow). False removes them from Home Assistant",
++    )
+ 
+     # WebSocket API mode (Energy Dashboard statistics)
+     ha_url: Optional[str] = Field(default=None, description="Home Assistant URL (e.g., http://homeassistant.local:8123)")
+diff --git a/apps/api/src/services/exporters/home_assistant.py b/apps/api/src/services/exporters/home_assistant.py
+index 440aa70..1d74699 100644
+--- a/apps/api/src/services/exporters/home_assistant.py
++++ b/apps/api/src/services/exporters/home_assistant.py
+@@ -168,6 +168,26 @@ TEMPO_PRICE_NAMES = {
+     "red_hp": "Red HP",
+ }
+ 
++# Groupes de capteurs facultatifs (issue #209) : option de la config → topics (sans le préfixe
++# d'entité) publiés par ce groupe. Une option à false retire ces entités de Home Assistant
++# (configuration de découverte vide). Absentes de la config : groupes exportés comme avant.
++OPTIONAL_SENSOR_GROUPS: dict[str, tuple[str, ...]] = {
++    "export_rte_tempo": ("rte/tempo_today", "rte/tempo_tomorrow"),
++    "export_edf_tempo": (
++        "edf/tempo_info",
++        "edf/tempo_days_blue",
++        "edf/tempo_days_white",
++        "edf/tempo_days_red",
++        "edf/tempo_price_blue_hp",
++        "edf/tempo_price_blue_hc",
++        "edf/tempo_price_white_hp",
++        "edf/tempo_price_white_hc",
++        "edf/tempo_price_red_hp",
++        "edf/tempo_price_red_hc",
++    ),
++    "export_zen_flex": ("edf/zen_flex_today", "edf/zen_flex_tomorrow"),
++}
++
+ # Noms affichés des entités (option entity_language, « fr » par défaut). Seul le nom change :
+ # unique_id, entity_id suggéré et états restent identiques, en français comme en anglais.
+ # L'anglais reprend les noms historiques de l'export.
+@@ -614,14 +634,14 @@ class HomeAssistantExporter(BaseExporter):
+ 
+                 # Global exports (not PDL-specific)
+                 try:
+-                    count = await self._export_tempo(client, db, usage_point_ids)
++                    count = await self._export_tempo_groups(client, db, usage_point_ids)
+                     results["tempo"] = count
+                 except Exception as e:
+                     logger.error(f"[HA-MQTT] Tempo export failed: {e}")
+                     results["errors"].append(f"tempo: {str(e)}")
+ 
+                 try:
+-                    count = await self._export_zen_flex(client, db)
++                    count = await self._export_zen_flex_group(client, db)
+                     results["zen_flex"] = count
+                 except Exception as e:
+                     logger.error(f"[HA-MQTT] Zen Flex export failed: {e}")
+@@ -797,7 +817,7 @@ class HomeAssistantExporter(BaseExporter):
+ 
+                 # Tempo
+                 try:
+-                    count = await self._export_tempo(client, db, usage_point_ids)
++                    count = await self._export_tempo_groups(client, db, usage_point_ids)
+                     results["tempo"] = count
+                     await emit(f"Tempo exporté ({count} entités)")
+                 except Exception as e:
+@@ -807,7 +827,7 @@ class HomeAssistantExporter(BaseExporter):
+ 
+                 # Zen Flex
+                 try:
+-                    count = await self._export_zen_flex(client, db)
++                    count = await self._export_zen_flex_group(client, db)
+                     results["zen_flex"] = count
+                     await emit(f"Zen Flex exporté ({count} entités)")
+                 except Exception as e:
+@@ -2216,8 +2236,60 @@ class HomeAssistantExporter(BaseExporter):
+     # TEMPO EXPORT (Old MyElectricalData format)
+     # =========================================================================
+ 
+-    async def _export_tempo(
++    def _group_enabled(self, option: str) -> bool:
++        """Groupe de capteurs facultatif exporté ? (option absente = oui, comme avant l'issue #209)"""
++        return bool(self.config.get(option, True))
++
++    async def _remove_sensors(self, client: aiomqtt.Client, option: str) -> int:
++        """Retire de Home Assistant les entités d'un groupe désactivé (issue #209)
++
++        Un message vide retenu sur le topic de configuration fait supprimer l'entité par Home Assistant ;
++        les topics d'état et d'attributs sont vidés aussi pour ne rien laisser sur le broker.
++        Sans effet si les entités n'existent pas : peut être rejoué à chaque export.
++        """
++        count = 0
++        for path in OPTIONAL_SENSOR_GROUPS[option]:
++            device, key = path.split("/", 1)
++            topic = f"{self.prefix}_{device}/{key}"
++            for kind in ("config", "state", "attributes"):
++                await client.publish(f"{self.discovery_prefix}/sensor/{topic}/{kind}", payload=b"", retain=True)
++            if self.discovery_prefix != "homeassistant":
++                await client.publish(f"homeassistant/sensor/{topic}/config", payload=b"", retain=True)
++            count += 1
++        return count
++
++    async def _export_tempo_groups(
+         self, client: aiomqtt.Client, db: AsyncSession, usage_point_ids: list[str] | None = None
++    ) -> int:
++        """Capteurs Tempo selon les options export_rte_tempo et export_edf_tempo (issue #209)
++
++        Retourne le nombre d'entités publiées ; les groupes désactivés sont retirés de Home Assistant.
++        """
++        rte = self._group_enabled("export_rte_tempo")
++        edf = self._group_enabled("export_edf_tempo")
++        for option, enabled in (("export_rte_tempo", rte), ("export_edf_tempo", edf)):
++            if not enabled:
++                removed = await self._remove_sensors(client, option)
++                logger.debug(f"[HA-MQTT] {option}=false : {removed} entités retirées")
++        if not (rte or edf):
++            return 0
++        return await self._export_tempo(client, db, usage_point_ids, rte=rte, edf=edf)
++
++    async def _export_zen_flex_group(self, client: aiomqtt.Client, db: AsyncSession) -> int:
++        """Capteurs Zen Flex selon l'option export_zen_flex (issue #209)"""
++        if not self._group_enabled("export_zen_flex"):
++            removed = await self._remove_sensors(client, "export_zen_flex")
++            logger.debug(f"[HA-MQTT] export_zen_flex=false : {removed} entités retirées")
++            return 0
++        return await self._export_zen_flex(client, db)
++
++    async def _export_tempo(
++        self,
++        client: aiomqtt.Client,
++        db: AsyncSession,
++        usage_point_ids: list[str] | None = None,
++        rte: bool = True,
++        edf: bool = True,
+     ) -> int:
+         """Export Tempo information via MQTT Discovery (old MyElectricalData format)
+ 
+@@ -2262,20 +2334,21 @@ class HomeAssistantExporter(BaseExporter):
+         today_tempo = result.scalar_one_or_none()
+         today_color = today_tempo.color.value if today_tempo else "Inconnu"
+ 
+-        await self._publish_sensor_old_format(
+-            client,
+-            topic=f"{self.prefix}_rte/tempo_today",
+-            name=self._entity_name("today"),
+-            unique_id=f"{self.prefix}_tempo_today",
+-            device=device_rte,
+-            state=today_color,
+-            attributes={
+-                "date": today_str,
+-                "color_fr": self._get_tempo_color_fr(today_color),
+-            },
+-            icon=self._get_tempo_icon(today_color),
+-        )
+-        count += 1
++        if rte:
++            await self._publish_sensor_old_format(
++                client,
++                topic=f"{self.prefix}_rte/tempo_today",
++                name=self._entity_name("today"),
++                unique_id=f"{self.prefix}_tempo_today",
++                device=device_rte,
++                state=today_color,
++                attributes={
++                    "date": today_str,
++                    "color_fr": self._get_tempo_color_fr(today_color),
++                },
++                icon=self._get_tempo_icon(today_color),
++            )
++            count += 1
+ 
+         # Tomorrow's color
+         result = await db.execute(
+@@ -2284,20 +2357,25 @@ class HomeAssistantExporter(BaseExporter):
+         tomorrow_tempo = result.scalar_one_or_none()
+         tomorrow_color = tomorrow_tempo.color.value if tomorrow_tempo else "Inconnu"
+ 
+-        await self._publish_sensor_old_format(
+-            client,
+-            topic=f"{self.prefix}_rte/tempo_tomorrow",
+-            name=self._entity_name("tomorrow"),
+-            unique_id=f"{self.prefix}_tempo_tomorrow",
+-            device=device_rte,
+-            state=tomorrow_color,
+-            attributes={
+-                "date": tomorrow_str,
+-                "color_fr": self._get_tempo_color_fr(tomorrow_color),
+-            },
+-            icon=self._get_tempo_icon(tomorrow_color),
+-        )
+-        count += 1
++        if rte:
++            await self._publish_sensor_old_format(
++                client,
++                topic=f"{self.prefix}_rte/tempo_tomorrow",
++                name=self._entity_name("tomorrow"),
++                unique_id=f"{self.prefix}_tempo_tomorrow",
++                device=device_rte,
++                state=tomorrow_color,
++                attributes={
++                    "date": tomorrow_str,
++                    "color_fr": self._get_tempo_color_fr(tomorrow_color),
++                },
++                icon=self._get_tempo_icon(tomorrow_color),
++            )
++            count += 1
++
++        if not edf:
++            logger.debug(f"[HA-MQTT] Exported Tempo: {count} sensors (EDF Tempo désactivé)")
++            return count
+ 
+         # =====================================================================
+         # EDF TEMPO: Days count per color
+diff --git a/apps/web/src/api/export.ts b/apps/web/src/api/export.ts
+index 38ae386..1be6caa 100644
+--- a/apps/web/src/api/export.ts
++++ b/apps/web/src/api/export.ts
+@@ -25,6 +25,10 @@ export interface HomeAssistantConfig {
+   discovery_prefix?: string
+   // Langue des noms affichés des entités : 'fr' (défaut) ou 'en' (noms historiques)
+   entity_language?: 'fr' | 'en'
++  // Groupes de capteurs facultatifs (issue #209) : false = entités non créées et retirées de Home Assistant
++  export_rte_tempo?: boolean
++  export_edf_tempo?: boolean
++  export_zen_flex?: boolean
+   // WebSocket API mode (Energy Dashboard statistics)
+   ha_url?: string
+   ha_token?: string
+diff --git a/apps/web/src/pages/HomeAssistant.tsx b/apps/web/src/pages/HomeAssistant.tsx
+index 7f9fc78..b78a51b 100644
+--- a/apps/web/src/pages/HomeAssistant.tsx
++++ b/apps/web/src/pages/HomeAssistant.tsx
+@@ -338,6 +338,10 @@ export default function HomeAssistant() {
+   const [entityPrefix, setEntityPrefix] = useState(runtimeDefaults.entityPrefix)
+   const [discoveryPrefix, setDiscoveryPrefix] = useState(runtimeDefaults.discoveryPrefix)
+   const [entityLanguage, setEntityLanguage] = useState<'fr' | 'en'>('fr')
++  // Groupes de capteurs facultatifs (issue #209) : décochés = entités non créées et retirées de Home Assistant
++  const [exportRteTempo, setExportRteTempo] = useState(true)
++  const [exportEdfTempo, setExportEdfTempo] = useState(true)
++  const [exportZenFlex, setExportZenFlex] = useState(true)
+ 
+   // WebSocket API config
+   const [haUrl, setHaUrl] = useState(runtimeDefaults.haUrl)
+@@ -455,6 +459,9 @@ export default function HomeAssistant() {
+         setEntityPrefix(cfg.entity_prefix || 'myelectricaldata')
+         setDiscoveryPrefix(cfg.discovery_prefix || 'homeassistant')
+         setEntityLanguage(cfg.entity_language === 'en' ? 'en' : 'fr')
++        setExportRteTempo(cfg.export_rte_tempo ?? true)
++        setExportEdfTempo(cfg.export_edf_tempo ?? true)
++        setExportZenFlex(cfg.export_zen_flex ?? true)
+         setMqttExportEnabled(cfg.mqtt_enabled ?? true)
+ 
+         // WebSocket config
+@@ -488,6 +495,9 @@ export default function HomeAssistant() {
+         entity_prefix: entityPrefix,
+         discovery_prefix: discoveryPrefix,
+         entity_language: entityLanguage,
++        export_rte_tempo: exportRteTempo,
++        export_edf_tempo: exportEdfTempo,
++        export_zen_flex: exportZenFlex,
+         mqtt_enabled: mqttExportEnabled,
+         // WebSocket API config
+         ha_url: haUrl,
+@@ -898,6 +908,61 @@ export default function HomeAssistant() {
+                     </p>
+                   </div>
+               </div>
++
++                {/* Groupes de capteurs facultatifs (issue #209) */}
++                <div className="mt-6">
++                  <p className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
++                    Capteurs à créer
++                  </p>
++                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
++                    Décochez les groupes qui ne servent pas à votre contrat (par exemple Tempo et Zen Flex en heures
++                    creuses / heures pleines). Au prochain export, leurs entités sont supprimées de Home Assistant et ne
++                    sont plus enregistrées dans son historique. Recochez pour les recréer.
++                  </p>
++                  <div className="space-y-3">
++                    {[
++                      {
++                        id: 'export-rte-tempo',
++                        checked: exportRteTempo,
++                        set: setExportRteTempo,
++                        label: 'RTE Tempo',
++                        help: `Couleur du jour et du lendemain : sensor.${entityPrefix || 'myelectricaldata'}_tempo_today, _tempo_tomorrow`,
++                      },
++                      {
++                        id: 'export-edf-tempo',
++                        checked: exportEdfTempo,
++                        set: setExportEdfTempo,
++                        label: 'EDF Tempo',
++                        help: `Jours restants par couleur et prix du kWh Tempo : sensor.${entityPrefix || 'myelectricaldata'}_tempo_info, _tempo_days_*, _tempo_price_*`,
++                      },
++                      {
++                        id: 'export-zen-flex',
++                        checked: exportZenFlex,
++                        set: setExportZenFlex,
++                        label: 'EDF Zen Flex',
++                        help: `Jour Éco, Sobriété ou Bonus : sensor.${entityPrefix || 'myelectricaldata'}_zen_flex_today, _zen_flex_tomorrow`,
++                      },
++                    ].map((group) => (
++                      <div key={group.id} className="flex items-start gap-2">
++                        <input
++                          type="checkbox"
++                          id={group.id}
++                          checked={group.checked}
++                          onChange={(e) => group.set(e.target.checked)}
++                          className="mt-0.5 rounded border-gray-300 dark:border-gray-600 text-primary-600 focus:ring-primary-500"
++                        />
++                        <label htmlFor={group.id} className="text-sm text-gray-700 dark:text-gray-300">
++                          {group.label}
++                          <span className="block text-xs text-gray-500 dark:text-gray-400 break-all">{group.help}</span>
++                        </label>
++                      </div>
++                    ))}
++                  </div>
++                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
++                    Les cartes qui affichent la couleur ou les prix Tempo (Carte Enedis Linky, cartes Tempo…) peuvent
++                    avoir besoin de RTE Tempo et EDF Tempo : laissez-les cochés si vous les utilisez.
++                  </p>
++                </div>
+             </div>
+ 
+             {/* WebSocket API Configuration - Pour le tableau Énergie */}
