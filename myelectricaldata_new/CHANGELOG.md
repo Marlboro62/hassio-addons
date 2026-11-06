@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.15.1.6
+
+- Page Exporter après une réinstallation de l'add-on : l'ancienne configuration Home Assistant, MQTT ou VictoriaMetrics restait affichée depuis le cache du navigateur, et l'enregistrement ou le test (« Auto Discovery ») répondait 404. La liste des configurations d'export n'est plus mise en cache et elle est relue à chaque ouverture de la page (issue #29).
+
 ## 2.15.1.5
 
 - Carte Linky (capteur sensor.myelectricaldata_linky_<pdl>_consumption) avec une offre Tempo : les coûts jour par jour (dailyweek_cost, dailyweek_costHC, dailyweek_costHP) et le coût d'hier (daily_cost) sont maintenant calculés au prix de la couleur Tempo de chaque demi-heure, au lieu de -1 et 0 (issue #32).
