@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.15.1.5
+
+- Carte Linky (capteur sensor.myelectricaldata_linky_<pdl>_consumption) avec une offre Tempo : les coûts jour par jour (dailyweek_cost, dailyweek_costHC, dailyweek_costHP) et le coût d'hier (daily_cost) sont maintenant calculés au prix de la couleur Tempo de chaque demi-heure, au lieu de -1 et 0 (issue #32).
+
 ## 2.15.1.4
 
 - Courbe de charge non souscrite chez Enedis (ADAM-ERR0191, par exemple la production d'un contrat en revente totale) : la synchro ne redemande plus chaque jour les deux ans d'historique et ne consomme plus tout le quota de la passerelle (1000/1000), qui bloquait aussi le PDL de consommation. Elle s'arrête à la première semaine sans service et réessaie après 7 jours (issue #34).
