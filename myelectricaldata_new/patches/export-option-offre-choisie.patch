@@ -1,0 +1,186 @@
+From 9d8a65090f329ba77ab276ae0f2d708224d77d7e Mon Sep 17 00:00:00 2001
+From: Marlboro62 <195607976+Marlboro62@users.noreply.github.com>
+Date: Fri, 6 Nov 2026 19:53:35 +0000
+Subject: [PATCH] fix(api): option tarifaire de l'offre choisie quand la
+ passerelle n'en donne pas
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Sans option fournisseur sur le PDL, l'export prenait le code
+d'acheminement du contrat (ou rien) et traitait le PDL en BASE : HC,
+HP et coûts à -1 dans le capteur linky-card, même avec l'offre EDF
+Tempo choisie dans le client.
+
+- le type de l'offre choisie (TEMPO, HC_HP…) fixe le profil quand le
+  PDL n'a pas d'option ; l'option du PDL reste prioritaire sinon ;
+- Tempo sans plage HC connue : 22h-6h, comme le capteur de statistiques ;
+- journal de l'export linky-card : tarif, nombre de plages HC et
+  présence de la courbe de charge.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01EzrPxe6qXk5VAyNcnhyntt
+---
+ apps/api/src/services/exporters/base.py       | 10 ++
+ .../src/services/exporters/home_assistant.py  |  3 +-
+ .../unit/test_export_option_offre_choisie.py  | 92 +++++++++++++++++++
+ 3 files changed, 104 insertions(+), 1 deletion(-)
+ create mode 100644 apps/api/tests/unit/test_export_option_offre_choisie.py
+
+diff --git a/apps/api/src/services/exporters/base.py b/apps/api/src/services/exporters/base.py
+index 4843f9d..bdfe4c3 100644
+--- a/apps/api/src/services/exporters/base.py
++++ b/apps/api/src/services/exporters/base.py
+@@ -12,6 +12,7 @@ from sqlalchemy import select
+ from sqlalchemy.ext.asyncio import AsyncSession
+ 
+ from .tariff import (
++    DEFAULT_OFFPEAK_RANGES,
+     ZEN_FLEX_OFFPEAK_RANGES,
+     TariffProfile,
+     hp_hc_window_start,
+@@ -114,6 +115,10 @@ class BaseExporter(ABC):
+         - Offre choisie EDF Zen Flex : plages HC de la grille fournisseur (hc_schedules de l'offre,
+           sinon 13h-18h et 20h-8h), pas celles du contrat Enedis, et profil HC/HP quelle que soit
+           l'option du PDL (le week-end Zen Flex a aussi ses heures pleines).
++        - PDL sans option fournisseur (la passerelle n'en donne pas) : le type de l'offre choisie
++          dans le client (TEMPO, HC_HP…) passe avant le code d'acheminement du contrat, sinon le PDL
++          serait exporté en BASE (HC, HP et coûts à -1).
++        - Tempo sans plage HC connue : 22h-6h, les heures creuses de l'option Tempo.
+ 
+         Returns:
+             Tuple (profil tarifaire, plages HC en minutes, subscribed_power_kva)
+@@ -150,6 +155,8 @@ class BaseExporter(ABC):
+                 )
+             )
+             offer = result.first()
++            if offer and offer.offer_type and not (pdl_data and pdl_data.pricing_option):
++                profile = tariff_profile(offer.offer_type)
+             if offer and is_zen_flex_offer(offer.offer_type, offer.name):
+                 offpeak_ranges = parse_offpeak_ranges(offer.hc_schedules)
+                 if not offpeak_ranges:
+@@ -158,6 +165,9 @@ class BaseExporter(ABC):
+                     offpeak_ranges = ZEN_FLEX_OFFPEAK_RANGES
+                 profile = tariff_profile("ZEN_FLEX")
+ 
++        if profile.family == "TEMPO" and not offpeak_ranges:
++            offpeak_ranges = list(DEFAULT_OFFPEAK_RANGES)
++
+         return profile, offpeak_ranges, subscribed_power
+ 
+     async def _get_hp_hc_summary(self, db: AsyncSession, pdl: str, today: date) -> dict[str, float] | None:
+diff --git a/apps/api/src/services/exporters/home_assistant.py b/apps/api/src/services/exporters/home_assistant.py
+index 440aa70..01f8c62 100644
+--- a/apps/api/src/services/exporters/home_assistant.py
++++ b/apps/api/src/services/exporters/home_assistant.py
+@@ -1856,7 +1856,8 @@ class HomeAssistantExporter(BaseExporter):
+ 
+         logger.info(
+             f"[HA-MQTT] Exported linky-card {direction} for {pdl}: "
+-            f"yesterday={yesterday_kwh}kWh, {nb_days} days history"
++            f"yesterday={yesterday_kwh}kWh, {nb_days} days history, tarif={tariff_info.family}, "
++            f"plages HC={len(offpeak_ranges)}, courbe 30 min={'oui' if has_detailed else 'non'}"
+         )
+         return 1
+ 
+diff --git a/apps/api/tests/unit/test_export_option_offre_choisie.py b/apps/api/tests/unit/test_export_option_offre_choisie.py
+new file mode 100644
+index 0000000..1d81b7c
+--- /dev/null
++++ b/apps/api/tests/unit/test_export_option_offre_choisie.py
+@@ -0,0 +1,92 @@
++"""Option tarifaire d'un PDL sans option fournisseur : celle de l'offre choisie dans le client
++
++Quand la passerelle ne donne pas l'option du PDL, l'export prenait le code d'acheminement du
++contrat (ou rien) et exportait le PDL en BASE : HC, HP et coûts à -1 sur la carte Linky, même
++avec l'offre EDF Tempo choisie. Tempo sans plage HC connue : 22h-6h.
++"""
++
++from types import SimpleNamespace
++from unittest.mock import AsyncMock, MagicMock
++
++import pytest
++
++from src.services.exporters.home_assistant import HomeAssistantExporter
++from src.services.exporters.tariff import TariffProfile
++
++
++def make_exporter() -> HomeAssistantExporter:
++    exporter = HomeAssistantExporter.__new__(HomeAssistantExporter)
++    exporter.config = {}
++    exporter.prefix = "myelectricaldata"
++    return exporter
++
++
++def fake_db(pdl_row: SimpleNamespace | None, contract_row: SimpleNamespace | None, offer_row: SimpleNamespace | None) -> MagicMock:
++    """execute() : ligne PDL, ligne ContractData, puis l'offre choisie"""
++    results = []
++    for value in (pdl_row, contract_row, offer_row):
++        result = MagicMock()
++        result.first.return_value = value
++        results.append(result)
++    db = MagicMock()
++    db.execute = AsyncMock(side_effect=results)
++    return db
++
++
++def pdl(pricing_option: str | None, offpeak_hours: object = None) -> SimpleNamespace:
++    return SimpleNamespace(pricing_option=pricing_option, offpeak_hours=offpeak_hours, subscribed_power=9, selected_offer_id="offre-1")
++
++
++def contract(pricing_option: str | None, offpeak_hours: object = None) -> SimpleNamespace:
++    return SimpleNamespace(pricing_option=pricing_option, offpeak_hours=offpeak_hours, subscribed_power=9)
++
++
++def offer(offer_type: str, name: str = "Tempo - 9 kVA") -> SimpleNamespace:
++    return SimpleNamespace(offer_type=offer_type, name=name, hc_schedules=None)
++
++
++@pytest.mark.parametrize("contract_option", [None, "", "BTINFMUDT"])
++async def test_pdl_sans_option_prend_l_offre_tempo_choisie(contract_option: str | None) -> None:
++    """Pas d'option sur le PDL : l'offre Tempo choisie fixe le profil, avec les plages HC du contrat"""
++    db = fake_db(pdl(None), contract(contract_option, {"default": "HC (22H30-6H30)"}), offer("TEMPO"))
++    profile, ranges, _ = await make_exporter()._get_pdl_contract_info(db, "123")
++    assert profile == TariffProfile("TEMPO")
++    assert ranges == [(1350, 390)]
++
++
++async def test_tempo_sans_plage_hc_prend_22h_6h() -> None:
++    """Ni le contrat ni le PDL ne donnent de plage : heures creuses de l'option Tempo, 22h-6h"""
++    db = fake_db(pdl(None), contract(None, None), offer("TEMPO"))
++    profile, ranges, _ = await make_exporter()._get_pdl_contract_info(db, "123")
++    assert profile.family == "TEMPO"
++    assert ranges == [(22 * 60, 6 * 60)]
++
++
++async def test_option_tempo_du_pdl_sans_plage_prend_22h_6h() -> None:
++    db = fake_db(SimpleNamespace(pricing_option="TEMPO", offpeak_hours=None, subscribed_power=9, selected_offer_id=None), None, None)
++    profile, ranges, _ = await make_exporter()._get_pdl_contract_info(db, "123")
++    assert profile.family == "TEMPO"
++    assert ranges == [(22 * 60, 6 * 60)]
++
++
++async def test_option_du_pdl_reste_prioritaire_sur_l_offre() -> None:
++    """La passerelle donne l'option du PDL : elle reste prioritaire, comme avant"""
++    db = fake_db(pdl("HC_HP", {"default": "HC (23H00-7H00)"}), None, offer("TEMPO"))
++    profile, ranges, _ = await make_exporter()._get_pdl_contract_info(db, "123")
++    assert profile == TariffProfile("HC_HP")
++    assert ranges == [(1380, 420)]
++
++
++async def test_pdl_sans_option_offre_hc_hp() -> None:
++    db = fake_db(pdl(None), contract("BTINFMUDT", {"default": "HC (22H00-6H00)"}), offer("HC_HP", "Tarif Bleu HC - 6 kVA"))
++    profile, ranges, _ = await make_exporter()._get_pdl_contract_info(db, "123")
++    assert profile == TariffProfile("HC_HP")
++    assert ranges == [(1320, 360)]
++
++
++async def test_hc_hp_sans_plage_reste_sans_plage() -> None:
++    """Seul Tempo a des heures creuses fixes : une offre HC/HP sans plage connue n'en invente pas"""
++    db = fake_db(pdl(None), contract(None, None), offer("HC_HP", "Tarif Bleu HC - 6 kVA"))
++    profile, ranges, _ = await make_exporter()._get_pdl_contract_info(db, "123")
++    assert profile.family == "HC_HP"
++    assert ranges == []
+-- 
+2.43.0
+
