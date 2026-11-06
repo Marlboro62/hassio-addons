@@ -6,7 +6,8 @@
 #   de l'add-on au choix (ex. 2.5.5.1 pour une révision propre à l'add-on), essai à blanc possible.
 #
 # Ordre : images amd64 et aarch64 construites et vérifiées (serveurs GitHub x86 et ARM natifs),
-# envoyées sur Docker Hub, puis seulement la branche bêta est mise à jour, et une issue prévient.
+# envoyées sur Docker Hub, puis seulement la branche bêta est mise à jour, et une issue prévient (les annonces
+# des bêtas précédentes encore ouvertes sont fermées).
 # Si un correctif de patches/ ne s'applique plus, la construction échoue et rien n'est publié.
 #
 # Prérequis : secret DOCKERHUB_TOKEN (jeton Docker Hub en lecture/écriture du compte marlboro62).
@@ -178,11 +179,22 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh issue create --repo "$GITHUB_REPOSITORY" \
+          url=$(gh issue create --repo "$GITHUB_REPOSITORY" \
             --title "Bêta MyElectricalData new $ADDON publiée : à tester" \
             --body "La bêta **$ADDON** (MyElectricalData [$MED](https://github.com/$UPSTREAM/releases/tag/$MED)) est publiée, images amd64 et aarch64 vérifiées.
 
           À faire :
           1. Dans HA : Boutique → ⋮ → Rechercher des mises à jour, puis mettre à jour **MyElectricalData New Beta**.
           2. Tester (synchro, exports, bouton « Exécuter » via la barre latérale, journaux).
-          3. Si tout va bien : Actions → **MyElectricalData new : stable** → Run workflow, version \`$ADDON\`. Cette issue sera fermée automatiquement."
+          3. Si tout va bien : Actions → **MyElectricalData new : stable** → Run workflow, version \`$ADDON\`. Cette issue sera fermée automatiquement.")
+          num="${url##*/}"
+          echo "Issue créée : $url"
+          # les annonces des bêtas précédentes, encore ouvertes, sont remplacées par celle-ci
+          [ -n "$num" ] || exit 0
+          gh issue list --repo "$GITHUB_REPOSITORY" --state open --author "app/github-actions" --limit 100 --json number,title \
+            --jq '.[] | select(.title | startswith("Bêta MyElectricalData new ")) | .number' |
+          while read -r n; do
+            [ "$n" = "$num" ] && continue
+            gh issue close "$n" --repo "$GITHUB_REPOSITORY" --reason "not planned" \
+              --comment "Remplacée par la bêta $ADDON (#$num), qui contient aussi les corrections de celle-ci." && echo "Annonce #$n fermée"
+          done
