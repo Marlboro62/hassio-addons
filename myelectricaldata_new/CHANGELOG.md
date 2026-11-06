@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.15.1.7
+
+- Tempo : HC, HP et coûts du capteur linky-card à -1 quand la passerelle ne donne pas l'option tarifaire (offre choisie prise en compte, heures creuses 22h-6h par défaut)
+
 ## 2.15.1.6
 
 - Page Exporter après une réinstallation de l'add-on : l'ancienne configuration Home Assistant, MQTT ou VictoriaMetrics restait affichée depuis le cache du navigateur, et l'enregistrement ou le test (« Auto Discovery ») répondait 404. La liste des configurations d'export n'est plus mise en cache et elle est relue à chaque ouverture de la page (issue #29).
