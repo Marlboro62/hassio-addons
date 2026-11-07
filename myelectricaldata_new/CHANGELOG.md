@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.15.1.8
+
+- PDL de production seule (revente totale) : plus de synchro de consommation quand le PDL n'en a pas, production bornée à la mise en service du PDL, arrêt de la courbe sur ADAM-DC-0007 (quota de la passerelle préservé)
+
 ## 2.15.1.7
 
 - Tempo : HC, HP et coûts du capteur linky-card à -1 quand la passerelle ne donne pas l'option tarifaire (offre choisie prise en compte, heures creuses 22h-6h par défaut)
