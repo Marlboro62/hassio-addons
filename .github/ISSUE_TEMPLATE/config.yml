@@ -1,1 +1,5 @@
 blank_issues_enabled: false
+contact_links:
+  - name: 🌐 Site, compte ou passerelle MyElectricalData
+    url: https://github.com/MyElectricalData/myelectricaldata_new/issues
+    about: Création de compte, consentement Enedis, erreur 500 sur v2.myelectricaldata.fr ou données qui n'arrivent plus de la passerelle. Ces services sont gérés par le développeur de MyElectricalData, pas par cet add-on.

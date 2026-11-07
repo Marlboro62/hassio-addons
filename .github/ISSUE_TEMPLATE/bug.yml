@@ -8,6 +8,8 @@ body:
       value: |
         Merci de prendre le temps de signaler ce problème.
         ⚠️ **Masquez vos informations personnelles** (adresse, ville, numéro de PDL, adresses IP, mots de passe, jetons) dans le texte et les captures.
+
+        🌐 **Problème avec le site ou la passerelle MyElectricalData** (création de compte, consentement Enedis, erreur 500 sur v2.myelectricaldata.fr, données qui n'arrivent plus) : ces services sont gérés par le développeur de MyElectricalData. Ouvrez l'issue sur [son dépôt](https://github.com/MyElectricalData/myelectricaldata_new/issues). Ici, les issues concernent l'add-on et les cartes.
   - type: input
     id: element
     attributes:
