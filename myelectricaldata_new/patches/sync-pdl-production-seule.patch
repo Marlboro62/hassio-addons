@@ -1,0 +1,190 @@
+diff --git a/apps/api/src/services/sync.py b/apps/api/src/services/sync.py
+index f463c9a..c6c8b84 100644
+--- a/apps/api/src/services/sync.py
++++ b/apps/api/src/services/sync.py
+@@ -55,6 +55,8 @@ DAILY_REFRESH_INTERVAL = timedelta(hours=6)
+ # production d'un contrat en revente totale, où Enedis ne collecte que l'index quotidien. Les
+ # semaines antérieures ne sont plus redemandées pendant NO_SERVICE_RETRY (quota de la passerelle).
+ NO_SERVICE_CODE = "ADAM-ERR0191"
++# Client non titulaire du point de livraison à cette période (contrat plus récent) : même traitement
++NO_SERVICE_CODES = (NO_SERVICE_CODE, "ADAM-DC-0007")
+ NO_SERVICE_MARKER = "Courbe de charge non souscrite chez Enedis avant le "
+ NO_SERVICE_RETRY = timedelta(days=7)
+ 
+@@ -81,7 +83,8 @@ def _normalize_utc(ts: datetime | None) -> datetime | None:
+ 
+ def _is_no_service(response: Any) -> bool:
+     """Réponse de la passerelle « aucun service souscrit ACCES à la donnée » (ADAM-ERR0191)"""
+-    return isinstance(response, dict) and NO_SERVICE_CODE in str(response.get("error") or "")
++    error = str(response.get("error") or "") if isinstance(response, dict) else ""
++    return any(code in error for code in NO_SERVICE_CODES)
+ 
+ 
+ def _no_service_before(sync_status: Any, now: datetime) -> date | None:
+@@ -142,8 +145,8 @@ async def get_activation_date(db: AsyncSession, usage_point_id: str, data_type:
+         activation = _parse_iso_date(parse_contract(raw).get(key))
+         if activation is not None:
+             return activation
+-    if data_type == "production":
+-        return None
++    # Production sans date dans le contrat : la mise en service du point de livraison reste une borne
++    # (aucune production avant). Sans elle, un PDL de production récent redemandait les années passées.
+     result = await db.execute(select(PDL.activation_date).where(PDL.usage_point_id == usage_point_id))
+     return _parse_iso_date(result.scalar_one_or_none())
+ 
+@@ -590,6 +593,9 @@ class SyncService:
+         }
+ 
+         rate_limited = False
++        # PDL sans consommation (production seule, par exemple en revente totale) : aucune donnée de
++        # consommation chez Enedis, les demander épuisait le quota de la passerelle (NO_DATA sur 2 ans)
++        no_consumption = bool(pdl_check_result) and pdl_check_result.has_consumption is False
+ 
+         # Sync contract and address first (they're small), at most once a day to spare the API quota
+         try:
+@@ -622,7 +628,11 @@ class SyncService:
+                 result["address"] = f"error: {e}"
+ 
+         # Sync consumption data
+-        if not rate_limited:
++        if no_consumption:
++            logger.debug(f"[SYNC] Skipping consumption sync for {usage_point_id} (has_consumption=False)")
++            for key in ("consumption_daily", "consumption_detail", "max_power"):
++                result[key] = "skipped (no consumption)"
++        if not rate_limited and not no_consumption:
+             try:
+                 daily_count = await self._sync_consumption_daily(usage_point_id)
+                 result["consumption_daily"] = f"synced {daily_count} days"
+@@ -633,7 +643,7 @@ class SyncService:
+                 logger.warning(f"[SYNC] Failed to sync consumption daily for {usage_point_id}: {e}")
+                 result["consumption_daily"] = f"error: {e}"
+ 
+-        if not rate_limited:
++        if not rate_limited and not no_consumption:
+             try:
+                 detail_count = await self._sync_consumption_detail(usage_point_id)
+                 result["consumption_detail"] = f"synced {detail_count} intervals"
+@@ -644,7 +654,7 @@ class SyncService:
+                 logger.warning(f"[SYNC] Failed to sync consumption detail for {usage_point_id}: {e}")
+                 result["consumption_detail"] = f"error: {e}"
+ 
+-        if not rate_limited:
++        if not rate_limited and not no_consumption:
+             try:
+                 max_power_count = await self._sync_consumption_max_power(usage_point_id)
+                 result["max_power"] = f"synced {max_power_count} days"
+@@ -1136,7 +1146,7 @@ class SyncService:
+                         sync_status.last_error_at = datetime.now(UTC)
+                         logger.warning(
+                             f"[SYNC] {data_type}/{granularity.value} pour {usage_point_id} : courbe de charge "
+-                            f"non souscrite chez Enedis avant le {current_end} ({NO_SERVICE_CODE}). "
++                            f"non souscrite chez Enedis avant le {current_end} ({', '.join(NO_SERVICE_CODES)}). "
+                             f"Semaines antérieures ignorées pendant {NO_SERVICE_RETRY.days} jours."
+                         )
+                         break
+diff --git a/apps/api/tests/unit/test_sync_production_seule.py b/apps/api/tests/unit/test_sync_production_seule.py
+new file mode 100644
+index 0000000..fb832ff
+--- /dev/null
++++ b/apps/api/tests/unit/test_sync_production_seule.py
+@@ -0,0 +1,100 @@
++"""Mode client : PDL de production seule (revente totale, contrat CRAE) sans épuiser le quota
++
++- pas de synchro de consommation quand le PDL n'a pas de consommation (has_consumption=False) ;
++- la production ne remonte pas avant la mise en service du PDL quand le contrat ne la donne pas ;
++- ADAM-DC-0007 (client non titulaire à cette période) arrête la remontée de la courbe, comme ADAM-ERR0191.
++"""
++
++from collections.abc import AsyncIterator
++from datetime import date, timedelta
++from unittest.mock import AsyncMock, MagicMock
++
++import pytest
++from sqlalchemy import select
++from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
++
++import src.models  # noqa: F401  (enregistre tous les modèles)
++from src.models.base import Base
++from src.models.pdl import PDL
++from src.models.user import User
++from src.services.sync import SyncService, _is_no_service
++
++PRM = "99999999999992"
++NO_DATA = {"success": False, "error": {"code": "NO_DATA", "message": "No data"}}
++NOT_HOLDER = {"success": False, "data": None, "error": {"code": "ENEDIS_ERROR", "message": "ADAM-DC-0007: client non titulaire"}}
++
++
++@pytest.fixture
++async def db() -> AsyncIterator[AsyncSession]:
++    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
++    async with engine.begin() as conn:
++        await conn.run_sync(Base.metadata.create_all)
++    async with async_sessionmaker(engine, expire_on_commit=False)() as session:
++        user = User(email="client@example.org", hashed_password="x", client_id="cid", client_secret="x")
++        session.add(user)
++        await session.flush()
++        session.add(PDL(usage_point_id=PRM, user_id=user.id, has_consumption=False, has_production=True))
++        await session.commit()
++        yield session
++    await engine.dispose()
++
++
++def make_service(db: AsyncSession, detail: dict = NO_DATA) -> SyncService:
++    service = SyncService.__new__(SyncService)
++    service.db = db
++    service.adapter = MagicMock()
++    for name in ("get_consumption_detail", "get_consumption_daily", "get_consumption_max_power",
++                 "get_production_daily", "get_contract", "get_address"):
++        setattr(service.adapter, name, AsyncMock(return_value=NO_DATA))
++    service.adapter.get_production_detail = AsyncMock(return_value=detail)
++    return service
++
++
++async def test_pas_de_consommation_pour_un_pdl_de_production_seule(db: AsyncSession) -> None:
++    service = make_service(db)
++
++    result = await service.sync_pdl(PRM)
++
++    for name in ("get_consumption_detail", "get_consumption_daily", "get_consumption_max_power"):
++        assert getattr(service.adapter, name).await_count == 0, name
++    assert result["consumption_daily"] == result["consumption_detail"] == result["max_power"] == "skipped (no consumption)"
++    assert service.adapter.get_production_daily.await_count >= 1
++
++
++async def test_consommation_toujours_synchronisee_par_defaut(db: AsyncSession) -> None:
++    pdl = (await db.execute(select(PDL).where(PDL.usage_point_id == PRM))).scalar_one()
++    pdl.has_consumption = True
++    await db.commit()
++    service = make_service(db)
++
++    await service.sync_pdl(PRM)
++
++    assert service.adapter.get_consumption_daily.await_count >= 1
++    assert service.adapter.get_consumption_detail.await_count >= 1
++
++
++async def test_production_bornee_a_la_mise_en_service_du_pdl(db: AsyncSession) -> None:
++    activation = date.today() - timedelta(days=60)
++    pdl = (await db.execute(select(PDL).where(PDL.usage_point_id == PRM))).scalar_one()
++    pdl.activation_date = activation
++    await db.commit()
++    service = make_service(db)
++
++    await service._sync_production_daily(PRM)
++
++    starts = [date.fromisoformat(c.args[1]) for c in service.adapter.get_production_daily.call_args_list]
++    assert min(starts) == activation
++
++
++def test_non_titulaire_traite_comme_courbe_non_souscrite() -> None:
++    assert _is_no_service(NOT_HOLDER)
++    assert _is_no_service({"error": {"message": "ADAM-ERR0191: aucun service souscrit"}})
++    assert not _is_no_service(NO_DATA)
++
++
++async def test_courbe_arretee_au_premier_non_titulaire(db: AsyncSession) -> None:
++    service = make_service(db, detail=NOT_HOLDER)
++
++    await service._sync_production_detail(PRM)
++
++    assert service.adapter.get_production_detail.await_count == 1  # au lieu d'une centaine de semaines
