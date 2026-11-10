@@ -46,7 +46,7 @@ index dc45b77..ea63be6 100644
          pdl.activation_date = parsed["activation_date"]
      logger.info(
 diff --git a/apps/api/src/services/exporters/base.py b/apps/api/src/services/exporters/base.py
-index bdfe4c3..45d833c 100644
+index bdfe4c3..a6c3fa3 100644
 --- a/apps/api/src/services/exporters/base.py
 +++ b/apps/api/src/services/exporters/base.py
 @@ -20,6 +20,7 @@ from .tariff import (
@@ -69,10 +69,10 @@ index bdfe4c3..45d833c 100644
          if profile.family == "TEMPO" and not offpeak_ranges:
              offpeak_ranges = list(DEFAULT_OFFPEAK_RANGES)
  
-+        # Heures creuses saisonnières saisies dans le client (clé « seasons » du PDL), sauf grille
-+        # fournisseur Zen Flex
++        # Heures creuses saisonnières saisies dans le client (clé « seasons » du PDL), sauf grilles
++        # fournisseur : Tempo (22h-6h toute l'année, hors réforme des heures creuses) et Zen Flex
 +        zen_flex = offer is not None and is_zen_flex_offer(offer.offer_type, offer.name)
-+        if pdl_data and profile.family != "BASE" and not zen_flex:
++        if pdl_data and profile.family == "HC_HP" and not zen_flex:
 +            offpeak_ranges = with_seasons(offpeak_ranges, pdl_data.offpeak_hours)
 +
          return profile, offpeak_ranges, subscribed_power
@@ -234,10 +234,10 @@ index c6c8b84..f7973c6 100644
          """Sync PDL list from remote API to local database
 diff --git a/apps/api/tests/unit/test_hc_saisonnieres.py b/apps/api/tests/unit/test_hc_saisonnieres.py
 new file mode 100644
-index 0000000..f70d932
+index 0000000..2bec1c0
 --- /dev/null
 +++ b/apps/api/tests/unit/test_hc_saisonnieres.py
-@@ -0,0 +1,117 @@
+@@ -0,0 +1,161 @@
 +"""Heures creuses saisonnières (réforme TURPE 7) : plages été / hiver saisies dans le client"""
 +
 +from datetime import date
@@ -355,6 +355,50 @@ index 0000000..f70d932
 +    pdl = SimpleNamespace(subscribed_power=None, offpeak_hours=dict(RAW), activation_date=None)
 +    enedis_contract.apply_contract_to_pdl(pdl, {})
 +    assert pdl.offpeak_hours == {"default": "HC (23H00-7H00)", "seasons": SEASONS}
++
++
++# --- Exports : plages saisonnières selon l'option tarifaire (cf. exporters/base.py) ---
++
++def _fake_db(pdl_row, contract_row, offer_row):
++    from unittest.mock import AsyncMock, MagicMock
++
++    results = []
++    for value in (pdl_row, contract_row, offer_row):
++        result = MagicMock()
++        result.first.return_value = value
++        results.append(result)
++    db = MagicMock()
++    db.execute = AsyncMock(side_effect=results)
++    return db
++
++
++def _exporter():
++    from src.services.exporters.home_assistant import HomeAssistantExporter
++
++    exporter = HomeAssistantExporter.__new__(HomeAssistantExporter)
++    exporter.config = {}
++    exporter.prefix = "myelectricaldata"
++    return exporter
++
++
++def _pdl(option):
++    return SimpleNamespace(pricing_option=option, offpeak_hours=dict(RAW), subscribed_power=6, selected_offer_id=None)
++
++
++@pytest.mark.asyncio
++async def test_export_hc_hp_applique_les_saisons():
++    _, ranges, _ = await _exporter()._get_pdl_contract_info(_fake_db(_pdl("HC_HP"), None, None), "123")
++    assert isinstance(ranges, SeasonalRanges)
++    assert is_offpeak(date(2027, 7, 14), 12, 0, ranges)
++
++
++@pytest.mark.asyncio
++async def test_export_tempo_ignore_les_saisons():
++    # Tempo : 22h-6h toute l'année, hors réforme des heures creuses
++    _, ranges, _ = await _exporter()._get_pdl_contract_info(_fake_db(_pdl("TEMPO"), None, None), "123")
++    assert not isinstance(ranges, SeasonalRanges)
++    assert not is_offpeak(date(2027, 7, 14), 12, 0, ranges)
++    assert is_offpeak(date(2027, 7, 14), 23, 0, ranges)
 diff --git a/apps/web/src/api/pdl.ts b/apps/web/src/api/pdl.ts
 index fc3e577..d84486b 100644
 --- a/apps/web/src/api/pdl.ts
@@ -392,10 +436,10 @@ index ed298b4..5982256 100644
                )}
 diff --git a/apps/web/src/components/SeasonalOffpeakEditor.tsx b/apps/web/src/components/SeasonalOffpeakEditor.tsx
 new file mode 100644
-index 0000000..415dfe0
+index 0000000..430b4da
 --- /dev/null
 +++ b/apps/web/src/components/SeasonalOffpeakEditor.tsx
-@@ -0,0 +1,251 @@
+@@ -0,0 +1,252 @@
 +import { useEffect, useMemo, useState } from 'react'
 +import { useMutation, useQueryClient } from '@tanstack/react-query'
 +import { CalendarRange, Minus, Plus, Save, Snowflake, Sun } from 'lucide-react'
@@ -564,7 +608,8 @@ index 0000000..415dfe0
 +          <p className="text-xs text-gray-500 dark:text-gray-400">
 +            Avec la réforme des heures creuses, les plages peuvent changer entre l'hiver et l'été. Saisissez celles
 +            indiquées par votre fournisseur. Avant la date de début, et pour une saison sans plage, les heures creuses
-+            habituelles ci-dessus s'appliquent.
++            habituelles ci-dessus s'appliquent. Sans effet avec une offre Tempo, dont les heures creuses restent
++            de 22h à 6h toute l'année.
 +          </p>
 +
 +          <div className="flex items-center gap-2 text-sm">
@@ -648,7 +693,7 @@ index 0000000..415dfe0
 +  )
 +}
 diff --git a/apps/web/src/pages/ConsumptionEuro/hooks/useConsumptionEuroCalcs.ts b/apps/web/src/pages/ConsumptionEuro/hooks/useConsumptionEuroCalcs.ts
-index 878c105..524f07d 100644
+index 878c105..66efd54 100644
 --- a/apps/web/src/pages/ConsumptionEuro/hooks/useConsumptionEuroCalcs.ts
 +++ b/apps/web/src/pages/ConsumptionEuro/hooks/useConsumptionEuroCalcs.ts
 @@ -1,6 +1,6 @@
@@ -659,16 +704,21 @@ index 878c105..524f07d 100644
  import { tempoApi, type TempoDay } from '@/api/tempo'
  import type { EnergyOffer } from '@/api/energy'
  import type { YearlyCost, MonthlyCost, SelectedOfferWithProvider } from '../types/euro.types'
-@@ -142,7 +142,7 @@ export function useConsumptionEuroCalcs({
+@@ -142,10 +142,11 @@ export function useConsumptionEuroCalcs({
        return []
      }
  
 -    const offpeakRanges = parseOffpeakHours(selectedPDLDetails?.offpeak_hours)
-+    const offpeakRangesAt = offpeakRangesResolver(selectedPDLDetails?.offpeak_hours)
++    const isTempo = selectedOffer.offer_type === 'TEMPO'
++    // Tempo : heures creuses fixes, les plages saisonnières ne s'appliquent pas
++    const offpeakRangesAt = offpeakRangesResolver(selectedPDLDetails?.offpeak_hours, { ignoreSeasons: isTempo })
      const defaultPrices = getOfferPrices(selectedOffer)
      const subscriptionMonthly = parsePrice(selectedOffer.subscription_price)
-     const isTempo = selectedOffer.offer_type === 'TEMPO'
-@@ -187,7 +187,7 @@ export function useConsumptionEuroCalcs({
+-    const isTempo = selectedOffer.offer_type === 'TEMPO'
+ 
+     const queryCache = queryClient.getQueryCache()
+     const allDetailQueries = queryCache.findAll({
+@@ -187,7 +188,7 @@ export function useConsumptionEuroCalcs({
  
          const hour = apiDateTime.getHours()
          const minute = apiDateTime.getMinutes()
@@ -678,27 +728,29 @@ index 878c105..524f07d 100644
          allReadings.push({
            date: apiDateTime,
 diff --git a/apps/web/src/pages/ConsumptionKwh/hooks/useConsumptionCalcs.ts b/apps/web/src/pages/ConsumptionKwh/hooks/useConsumptionCalcs.ts
-index 3bd27f0..05b5c02 100644
+index 3bd27f0..590950f 100644
 --- a/apps/web/src/pages/ConsumptionKwh/hooks/useConsumptionCalcs.ts
 +++ b/apps/web/src/pages/ConsumptionKwh/hooks/useConsumptionCalcs.ts
 @@ -1,6 +1,6 @@
  import { useMemo, useEffect, useState } from 'react'
  import { useQueryClient } from '@tanstack/react-query'
 -import { parseOffpeakHours, offpeakFraction } from '@/utils/offpeakHours'
-+import { offpeakRangesResolver, offpeakFraction } from '@/utils/offpeakHours'
++import { isTempoOption, offpeakRangesResolver, offpeakFraction } from '@/utils/offpeakHours'
  import { useDatePreferencesStore } from '@/stores/datePreferencesStore'
  import { getIntervalLength, getReadings, getUnit, hasReadings, readingEnergyWh, readingHours } from '@/utils/enedisMeasure'
  import type { MeasureReading } from '@/types/api'
-@@ -556,7 +556,7 @@ export function useConsumptionCalcs({
+@@ -556,7 +556,9 @@ export function useConsumptionCalcs({
        return []
      }
  
 -    const offpeakRanges = parseOffpeakHours(selectedPDLDetails?.offpeak_hours)
-+    const offpeakRangesAt = offpeakRangesResolver(selectedPDLDetails?.offpeak_hours)
++    const offpeakRangesAt = offpeakRangesResolver(selectedPDLDetails?.offpeak_hours, {
++      ignoreSeasons: isTempoOption(selectedPDLDetails?.pricing_option),
++    })
      const queryCache = queryClient.getQueryCache()
      const allDetailQueries = queryCache.findAll({
        queryKey: ['consumptionDetail', selectedPDL],
-@@ -589,7 +589,7 @@ export function useConsumptionCalcs({
+@@ -589,7 +591,7 @@ export function useConsumptionCalcs({
          const hour = apiDateTime.getHours()
          const minute = apiDateTime.getMinutes()
          // Part HC au prorata des minutes du créneau (plage HC qui commence ou finit dans le créneau)
@@ -707,16 +759,27 @@ index 3bd27f0..05b5c02 100644
  
          allReadings.push({
            date: apiDateTime,
-@@ -648,7 +648,7 @@ export function useConsumptionCalcs({
+@@ -640,7 +642,7 @@ export function useConsumptionCalcs({
+     }).filter(p => p.totalKwh > 0)
+ 
+     return result
+-  }, [selectedPDL, selectedPDLDetails?.offpeak_hours, hcHpCalculationTrigger, queryClient])
++  }, [selectedPDL, selectedPDLDetails?.offpeak_hours, selectedPDLDetails?.pricing_option, hcHpCalculationTrigger, queryClient])
+ 
+   // Calculate monthly HC/HP data for each rolling year period
+   const monthlyHcHpByYear = useMemo(() => {
+@@ -648,7 +650,9 @@ export function useConsumptionCalcs({
        return []
      }
  
 -    const offpeakRanges = parseOffpeakHours(selectedPDLDetails.offpeak_hours)
-+    const offpeakRangesAt = offpeakRangesResolver(selectedPDLDetails.offpeak_hours)
++    const offpeakRangesAt = offpeakRangesResolver(selectedPDLDetails.offpeak_hours, {
++      ignoreSeasons: isTempoOption(selectedPDLDetails.pricing_option),
++    })
      const queryCache = queryClient.getQueryCache()
      const allDetailQueries = queryCache.findAll({
        queryKey: ['consumptionDetail', selectedPDL],
-@@ -680,7 +680,7 @@ export function useConsumptionCalcs({
+@@ -680,7 +684,7 @@ export function useConsumptionCalcs({
          const hour = apiDateTime.getHours()
          const minute = apiDateTime.getMinutes()
          // Part HC au prorata des minutes du créneau (plage HC qui commence ou finit dans le créneau)
@@ -725,18 +788,27 @@ index 3bd27f0..05b5c02 100644
  
          allReadings.push({ date: apiDateTime, energyKwh, hcShare })
        })
+@@ -751,7 +755,7 @@ export function useConsumptionCalcs({
+     }).filter(p => p.months.length >= 12)
+ 
+     return result
+-  }, [selectedPDL, selectedPDLDetails?.offpeak_hours, hcHpCalculationTrigger, queryClient])
++  }, [selectedPDL, selectedPDLDetails?.offpeak_hours, selectedPDLDetails?.pricing_option, hcHpCalculationTrigger, queryClient])
+ 
+   return {
+     chartData,
 diff --git a/apps/web/src/utils/__tests__/offpeakHours.test.ts b/apps/web/src/utils/__tests__/offpeakHours.test.ts
-index 2972808..c8033ce 100644
+index 2972808..d271b1e 100644
 --- a/apps/web/src/utils/__tests__/offpeakHours.test.ts
 +++ b/apps/web/src/utils/__tests__/offpeakHours.test.ts
 @@ -1,5 +1,5 @@
  import { describe, expect, it } from 'vitest'
 -import { isOffpeakTime, offpeakFraction, parseOffpeakHours } from '../offpeakHours'
-+import { isOffpeakTime, offpeakFraction, offpeakRangesResolver, parseOffpeakHours, parseOffpeakSeasons, seasonOf } from '../offpeakHours'
++import { isOffpeakTime, isTempoOption, offpeakFraction, offpeakRangesResolver, parseOffpeakHours, parseOffpeakSeasons, seasonOf } from '../offpeakHours'
  
  // Contrat dont les plages HC ne tombent pas sur la demi-heure (cas réel comparé au ZLinky)
  const DECALEES = parseOffpeakHours({ ranges: ['23:32-05:32', '14:32-16:32'] })
-@@ -42,3 +42,41 @@ describe('offpeakFraction', () => {
+@@ -42,3 +42,48 @@ describe('offpeakFraction', () => {
      expect(hc).toBe(8 * 60)
    })
  })
@@ -777,12 +849,19 @@ index 2972808..c8033ce 100644
 +    expect(at(new Date(2027, 0, 14))).toEqual(parseOffpeakHours(['22:00-06:00']))
 +    expect(isOffpeakTime(12, 0, at(new Date(2020, 5, 1)))).toBe(true) // pas de date de début
 +  })
++
++  it('offre Tempo : plages habituelles toute l\'année', () => {
++    expect(isTempoOption('TEMPO')).toBe(true)
++    expect(isTempoOption('HC_HP')).toBe(false)
++    const at = offpeakRangesResolver(config, { ignoreSeasons: true })
++    expect(at(new Date(2027, 6, 14))).toEqual(parseOffpeakHours(['22:00-06:00']))
++  })
 +})
 diff --git a/apps/web/src/utils/offpeakHours.ts b/apps/web/src/utils/offpeakHours.ts
-index 3cf5783..2e6bb4f 100644
+index 3cf5783..f75c5d0 100644
 --- a/apps/web/src/utils/offpeakHours.ts
 +++ b/apps/web/src/utils/offpeakHours.ts
-@@ -7,6 +7,71 @@ export interface OffpeakRange {
+@@ -7,6 +7,80 @@ export interface OffpeakRange {
    endMin: number
  }
  
@@ -836,13 +915,22 @@ index 3cf5783..2e6bb4f 100644
 +  return { since, summer, winter }
 +}
 +
++/** Option tarifaire Tempo : heures creuses fixes (22h-6h), hors réforme des heures creuses */
++export function isTempoOption(option?: string | null): boolean {
++  return (option || '').toUpperCase().includes('TEMPO')
++}
++
 +/**
 + * Plages HC à appliquer selon la date du relevé : plages de la saison à partir de la date de
 + * début, sinon (avant cette date, ou saison non saisie) les plages habituelles.
++ * ignoreSeasons : offre Tempo, dont les heures creuses ne changent pas avec la saison.
 + */
-+export function offpeakRangesResolver(offpeakConfig?: unknown): (date: Date) => OffpeakRange[] {
++export function offpeakRangesResolver(
++  offpeakConfig?: unknown,
++  options: { ignoreSeasons?: boolean } = {},
++): (date: Date) => OffpeakRange[] {
 +  const base = parseOffpeakHours(offpeakConfig as Parameters<typeof parseOffpeakHours>[0])
-+  const seasons = parseOffpeakSeasons(offpeakConfig)
++  const seasons = options.ignoreSeasons ? null : parseOffpeakSeasons(offpeakConfig)
 +  if (!seasons) return () => base
 +  return (date: Date) => {
 +    if (seasons.since && localDateKey(date) < seasons.since) return base
@@ -854,7 +942,7 @@ index 3cf5783..2e6bb4f 100644
  /**
   * Parse offpeak hours configuration from PDL
   * Supports both array format ["22:00-06:00"] and legacy object format {"HC": "22h00-06h00"}
-@@ -22,7 +87,10 @@ export function parseOffpeakHours(offpeakConfig?: string[] | Record<string, stri
+@@ -22,7 +96,10 @@ export function parseOffpeakHours(offpeakConfig?: string[] | Record<string, stri
    if (Array.isArray(offpeakConfig)) {
      rawValues = offpeakConfig
    } else {
@@ -867,7 +955,7 @@ index 3cf5783..2e6bb4f 100644
    const rangeStrings: string[] = rawValues.filter((item): item is string => typeof item === 'string' && Boolean(item))
  
 diff --git a/docs/specs/pages/02-dashboard.md b/docs/specs/pages/02-dashboard.md
-index 4193b8b..6a2d1d4 100644
+index 4193b8b..1a39684 100644
 --- a/docs/specs/pages/02-dashboard.md
 +++ b/docs/specs/pages/02-dashboard.md
 @@ -27,6 +27,7 @@ Tableau de bord principal pour gérer les Points De Livraison (PDL) et accéder
@@ -889,7 +977,7 @@ index 4193b8b..6a2d1d4 100644
 +- Enregistrées dans la clé `seasons` de `offpeak_hours` : `{"ranges": [...], "seasons": {"since": "2026-11-01", "winter": ["22:00-06:00"], "summer": ["02:00-06:00", "11:00-15:00"]}}`.
 +- Conservées par la synchronisation (passerelle ou contrat Enedis) et par la modification des plages habituelles ; `"seasons": null` les retire.
 +- Avant la date de début, et pour une saison sans plage, les plages habituelles s'appliquent : l'historique garde ses anciennes heures creuses.
-+- Utilisées par les pages Consommation (kWh et €) et par les exports (`exporters/tariff.py`, sauf grille fournisseur Zen Flex).
++- Utilisées par les pages Consommation (kWh et €) et par les exports (`exporters/tariff.py`) pour les options heures pleines / heures creuses. Sans effet avec Tempo (22h-6h toute l'année, hors réforme) et avec la grille fournisseur Zen Flex.
 +
  ### Liaison Consommation-Production
  

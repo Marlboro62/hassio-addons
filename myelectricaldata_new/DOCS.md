@@ -28,7 +28,7 @@ Avec la réforme des heures creuses, les plages peuvent différer entre l'**hive
 2. indiquez la date du changement (**À partir du**) et les plages de chaque saison (celles données par votre fournisseur) ;
 3. cliquez sur **Enregistrer**.
 
-Avant cette date, et pour une saison sans plage, les heures creuses habituelles s'appliquent : l'historique n'est pas recalculé avec les nouvelles plages. Les pages Consommation (kWh et €) et l'export Home Assistant (HC, HP et coûts de la carte Linky) suivent la saison du jour. La synchronisation avec la passerelle ne les efface pas.
+Avant cette date, et pour une saison sans plage, les heures creuses habituelles s'appliquent : l'historique n'est pas recalculé avec les nouvelles plages. Les pages Consommation (kWh et €) et l'export Home Assistant (HC, HP et coûts de la carte Linky) suivent la saison du jour. Sans effet avec une offre **Tempo** : ses heures creuses restent de 22h à 6h toute l'année (hors réforme). La synchronisation avec la passerelle ne les efface pas.
 
 ## Export vers Home Assistant
 
