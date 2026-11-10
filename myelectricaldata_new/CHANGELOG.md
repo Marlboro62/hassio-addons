@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.15.1.11
+
+- Interface : mention BÊTA à côté du numéro de version, en bas à gauche, pour distinguer la bêta de la version stable
+
 ## 2.15.1.10
 
 - Heures creuses saisonnières : sans effet avec une offre Tempo, dont les heures creuses restent de 22h à 6h toute l'année (hors réforme)
