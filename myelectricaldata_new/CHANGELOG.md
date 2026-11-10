@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.15.1.10
+
+- Heures creuses saisonnières : sans effet avec une offre Tempo, dont les heures creuses restent de 22h à 6h toute l'année (hors réforme)
+
 ## 2.15.1.9
 
 - Heures creuses saisonnières (bêta) : plages d'hiver (1er novembre → 31 mars) et d'été (1er avril → 31 octobre) à partir d'une date, à saisir dans la carte du PDL ; utilisées par les pages Consommation et l'export Home Assistant, l'historique garde ses anciennes heures creuses
