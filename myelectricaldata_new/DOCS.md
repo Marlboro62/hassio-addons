@@ -20,6 +20,16 @@
 Bouton **Ouvrir l'interface utilisateur web**, ou `http://<ip-de-home-assistant>:8100`.
 La connexion est automatique (utilisateur local). N'exposez pas le port 8100 sur Internet : utilisez un VPN pour un accès distant.
 
+### Heures creuses saisonnières (bêta)
+
+Avec la réforme des heures creuses, les plages peuvent différer entre l'**hiver** (1er novembre → 31 mars) et l'**été** (1er avril → 31 octobre). Sur le tableau de bord, dans la carte du PDL, sous **Heures creuses** :
+
+1. cochez **Heures creuses saisonnières** ;
+2. indiquez la date du changement (**À partir du**) et les plages de chaque saison (celles données par votre fournisseur) ;
+3. cliquez sur **Enregistrer**.
+
+Avant cette date, et pour une saison sans plage, les heures creuses habituelles s'appliquent : l'historique n'est pas recalculé avec les nouvelles plages. Les pages Consommation (kWh et €) et l'export Home Assistant (HC, HP et coûts de la carte Linky) suivent la saison du jour. La synchronisation avec la passerelle ne les efface pas.
+
 ## Export vers Home Assistant
 
 Dans l'interface web, onglet **Export > Home Assistant** :
