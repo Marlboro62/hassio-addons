@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.15.1.9
+
+- Heures creuses saisonnières (bêta) : plages d'hiver (1er novembre → 31 mars) et d'été (1er avril → 31 octobre) à partir d'une date, à saisir dans la carte du PDL ; utilisées par les pages Consommation et l'export Home Assistant, l'historique garde ses anciennes heures creuses
+
 ## 2.15.1.8
 
 - PDL de production seule (revente totale) : plus de synchro de consommation quand le PDL n'en a pas, production bornée à la mise en service du PDL, arrêt de la courbe sur ADAM-DC-0007 (quota de la passerelle préservé)
