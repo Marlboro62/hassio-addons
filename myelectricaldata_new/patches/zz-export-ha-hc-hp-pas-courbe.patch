@@ -1,0 +1,92 @@
+Correctif de la PR amont MyElectricalData/myelectricaldata_new#219 (issue Marlboro62/content-card-linky-new#13)
+Export Home Assistant (capteur de la carte Linky) : HC + HP valaient le double de la consommation
+du jour avec une courbe au pas de 15 min ou un créneau enregistré en double.
+- énergie du créneau = puissance × durée du créneau (slot_wh)
+- un créneau en double (même jour, même heure) n'est compté qu'une fois
+Préfixe « zz- » : appliqué en dernier, après linky-card-couts-tempo.patch qui modifie la même boucle.
+
+diff --git a/apps/api/src/services/exporters/home_assistant.py b/apps/api/src/services/exporters/home_assistant.py
+index df501da..216b9aa 100644
+--- a/apps/api/src/services/exporters/home_assistant.py
++++ b/apps/api/src/services/exporters/home_assistant.py
+@@ -55,6 +55,7 @@ from .tariff import (
+     is_zen_flex_offer,
+     offpeak_fraction,
+     offpeak_slot_fraction,
++    slot_wh,
+     tariff_profile,
+ )
+ 
+@@ -1521,7 +1522,15 @@ class HomeAssistantExporter(BaseExporter):
+ 
+         # Grouper les données détaillées par jour
+         detailed_by_day: dict[date, list[tuple[str | None, int]]] = defaultdict(list)
++        seen_slots: set[tuple[date, str]] = set()
+         for d, interval_start, value in detailed_records:
++            # Un même créneau enregistré sous deux écritures ("08:00" et "08:00:00", relevés v5 puis
++            # Data Connect 2026) n'est compté qu'une fois : sinon HC + HP valent le double du total
++            if interval_start:
++                slot = ":".join(part.zfill(2) for part in interval_start.split(":")[:2])
++                if (d, slot) in seen_slots:
++                    continue
++                seen_slots.add((d, slot))
+             detailed_by_day[d].append((interval_start, value))
+ 
+         has_detailed = len(detailed_records) > 0
+@@ -1549,9 +1558,9 @@ class HomeAssistantExporter(BaseExporter):
+             tempo_known = bool(tempo_prices) and has_offpeak
+ 
+             for interval_start, value in intervals:
+-                # Les valeurs DETAILED sont en W (puissance moyenne sur 30min)
+-                # Énergie sur 30min = W / 2 pour obtenir des Wh
+-                wh = value / 2
++                # Les valeurs DETAILED sont en W (puissance moyenne sur le créneau) :
++                # énergie = W × durée du créneau (30 min : W / 2, 15 min : W / 4, 10 min : W / 6)
++                wh = slot_wh(value, slot_minutes)
+ 
+                 # HP/HC, au prorata des minutes si une plage HC commence ou finit dans le créneau
+                 fraction = (
+diff --git a/apps/api/src/services/exporters/tariff.py b/apps/api/src/services/exporters/tariff.py
+index f1fd6bb..6a4863a 100644
+--- a/apps/api/src/services/exporters/tariff.py
++++ b/apps/api/src/services/exporters/tariff.py
+@@ -305,6 +305,11 @@ def infer_interval_minutes(interval_starts: Iterable[str | None]) -> int:
+     return min(gaps) if gaps else _DEFAULT_INTERVAL_MINUTES
+ 
+ 
++def slot_wh(value_w: int | float, slot_minutes: int) -> float:
++    """Énergie (Wh) d'un créneau de courbe de charge : puissance moyenne (W) × durée du créneau"""
++    return value_w * (slot_minutes if slot_minutes > 0 else _DEFAULT_INTERVAL_MINUTES) / 60
++
++
+ def interval_wh(value_w: int | float, raw_data: dict[str, Any] | None) -> float:
+     """Convertit une puissance moyenne (W) en énergie (Wh) selon le pas du relevé (PT30M par défaut)"""
+     return value_w * interval_minutes(raw_data) / 60
+diff --git a/apps/api/tests/unit/test_tariff.py b/apps/api/tests/unit/test_tariff.py
+index 4f84d43..f7590fe 100644
+--- a/apps/api/tests/unit/test_tariff.py
++++ b/apps/api/tests/unit/test_tariff.py
+@@ -342,3 +342,23 @@ def test_summarize_hp_hc_kwh_odd_ranges() -> None:
+ )
+ def test_infer_interval_minutes(starts: list, expected: int) -> None:
+     assert infer_interval_minutes(starts) == expected
++
++
++def test_slot_wh_selon_le_pas_de_la_courbe():
++    """Puissance moyenne (W) × durée du créneau : 1 000 W pendant 30 / 15 / 10 min"""
++    from src.services.exporters.tariff import slot_wh
++
++    assert slot_wh(1000, 30) == 500
++    assert slot_wh(1000, 15) == 250
++    assert slot_wh(1000, 10) == pytest.approx(166.667, rel=1e-3)
++    assert slot_wh(1000, 0) == 500  # pas inconnu : 30 min
++
++
++def test_journee_au_pas_de_15_min_non_doublee():
++    """Courbe au pas de 15 min, 1 000 W toute la journée : 24 kWh, pas 48 (#13 content-card-linky-new)"""
++    from src.services.exporters.tariff import infer_interval_minutes, slot_wh
++
++    starts = [f"{m // 60:02d}:{m % 60:02d}" for m in range(0, 1440, 15)]
++    slot = infer_interval_minutes(starts)
++    assert slot == 15
++    assert sum(slot_wh(1000, slot) for _ in starts) == 24000
