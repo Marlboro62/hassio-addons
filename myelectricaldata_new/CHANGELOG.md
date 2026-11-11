@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.15.1.12
+
+- Carte Linky (capteur sensor.myelectricaldata_linky_<pdl>_consumption) : HC + HP valaient le double de la consommation du jour avec une courbe au pas de 15 min ou un créneau enregistré en double ; énergie calculée selon le pas réel de la courbe (issue content-card-linky-new#13, PR amont #219)
+
 ## 2.15.1.11
 
 - Interface : mention BÊTA à côté du numéro de version, en bas à gauche, pour distinguer la bêta de la version stable
