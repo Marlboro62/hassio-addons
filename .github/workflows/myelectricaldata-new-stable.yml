@@ -75,6 +75,8 @@ jobs:
           done
 
       - name: Mettre à jour master
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           # Différences de config.yaml hors lignes propres à chaque variante : à reporter à la main
           norm() { grep -vE '^(name|version|image|slug|stage):|^  8100/tcp: [0-9]+$' ; }
@@ -96,10 +98,8 @@ jobs:
           grep -q "^version: \"$VERSION\"" "$ADDON_DIR/config.yaml"
           git diff --cached --quiet -- "$ADDON_DIR/config.yaml" && { echo "::error::config.yaml n'a pas été mis à jour"; exit 1; }
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "myelectricaldata_new $VERSION: promotion de la bêta testée (automatique)"
-          git push origin HEAD:master
+          # Commit créé par l'API GitHub : signé par GitHub, il apparaît « Verified »
+          python3 .github/scripts/commit_signe.py master "myelectricaldata_new $VERSION: promotion de la bêta testée (automatique)"
 
       - name: Reconstruire la démo et fermer l'issue
         continue-on-error: true  # la publication est déjà faite : une issue impossible à créer ne doit pas la marquer en échec

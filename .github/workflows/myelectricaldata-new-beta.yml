@@ -150,6 +150,12 @@ jobs:
         with:
           ref: ${{ env.BRANCH }}
 
+      # Script de commit signé, pris sur la branche du workflow (la branche bêta ne l'a pas)
+      - uses: actions/checkout@v5
+        with:
+          path: .outils
+          sparse-checkout: .github/scripts
+
       - name: Vérifier que les deux images sont en ligne
         run: |
           for arch in amd64 aarch64; do
@@ -158,6 +164,8 @@ jobs:
           done
 
       - name: Mettre à jour la branche bêta
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           sed -i "s/^ARG MED_VERSION=.*/ARG MED_VERSION=$MED/" "$ADDON_DIR/Dockerfile"
           sed -i "s/^version: .*/version: \"$ADDON\"/" "$ADDON_DIR/config.yaml"
@@ -169,10 +177,9 @@ jobs:
           head, sep, rest = text.partition("\n\n")
           open(path, "w", encoding="utf-8").write(f"{head}\n\n## {version}\n\n- {line}\n\n{rest}")
           EOF
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "myelectricaldata_new beta $ADDON: upstream $MED (automatique)"
-          git push origin "HEAD:$BRANCH"
+          # Commit créé par l'API GitHub : signé par GitHub, il apparaît « Verified »
+          git add -A "$ADDON_DIR"
+          python3 .outils/.github/scripts/commit_signe.py "$BRANCH" "myelectricaldata_new beta $ADDON: upstream $MED (automatique)"
 
       - name: Prévenir par une issue
         continue-on-error: true  # la publication est déjà faite : une issue impossible à créer ne doit pas la marquer en échec

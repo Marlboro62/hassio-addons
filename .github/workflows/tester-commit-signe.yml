@@ -1,0 +1,35 @@
+# Vérifie que le script .github/scripts/commit_signe.py produit bien un commit « Verified »,
+# sur une branche temporaire supprimée à la fin (aucune autre branche n'est touchée).
+name: "Tester le commit signé"
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TMP_BRANCH: tmp-test-commit-signe-${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Créer la branche temporaire
+        run: gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/heads/$TMP_BRANCH" -f sha="$(git rev-parse HEAD)" --jq .ref
+
+      - name: Commit signé par l'API
+        run: |
+          date -u > test-commit-signe.txt
+          git add test-commit-signe.txt
+          python3 .github/scripts/commit_signe.py "$TMP_BRANCH" "test: commit signé (automatique, branche temporaire)"
+          sha=$(git rev-parse HEAD)
+          verified=$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha" --jq .commit.verification.verified)
+          echo "Commit $sha : verified=$verified" | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$verified" = "true" ]
+
+      - name: Supprimer la branche temporaire
+        if: always()
+        run: gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/$TMP_BRANCH" || true
