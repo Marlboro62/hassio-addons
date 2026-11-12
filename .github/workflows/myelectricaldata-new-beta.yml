@@ -198,8 +198,9 @@ jobs:
           echo "Issue créée : $url"
           # les annonces des bêtas précédentes, encore ouvertes, sont remplacées par celle-ci
           [ -n "$num" ] || exit 0
-          gh issue list --repo "$GITHUB_REPOSITORY" --state open --author "app/github-actions" --limit 100 --json number,title \
-            --jq '.[] | select(.title | startswith("Bêta MyElectricalData new ")) | .number' |
+          # API REST : les annonces sont créées par github-actions[bot] (le filtre --author de gh issue list ne les trouvait pas)
+          gh api "repos/$GITHUB_REPOSITORY/issues?state=open&creator=github-actions%5Bbot%5D&per_page=100" \
+            --jq '.[] | select(.pull_request | not) | select(.title | startswith("Bêta MyElectricalData new ")) | .number' |
           while read -r n; do
             [ "$n" = "$num" ] && continue
             gh issue close "$n" --repo "$GITHUB_REPOSITORY" --reason "not planned" \
