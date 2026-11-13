@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.15.1.13
+
+- Courbe de charge activée récemment : les semaines NO_DATA d'avant la courbe disponible chez Enedis ne sont plus redemandées à chaque synchro (arrêt après 4 semaines vides d'affilée, nouvel essai après 7 jours). Après un redémarrage, l'export Home Assistant garde l'option de l'offre choisie (HC/HP) au lieu de celle de la passerelle (BASE), et retrouve ses prix (issue #48)
+
 ## 2.15.1.12
 
 - Carte Linky (capteur sensor.myelectricaldata_linky_<pdl>_consumption) : HC + HP valaient le double de la consommation du jour avec une courbe au pas de 15 min ou un créneau enregistré en double ; énergie calculée selon le pas réel de la courbe (issue content-card-linky-new#13, PR amont #219)
