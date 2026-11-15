@@ -1,0 +1,103 @@
+From 505d86fa064bb29bd7cabd060f28b21723e2099c Mon Sep 17 00:00:00 2001
+From: Marlboro62 <195607976+Marlboro62@users.noreply.github.com>
+Date: Sun, 15 Nov 2026 04:57:07 +0000
+Subject: [PATCH] =?UTF-8?q?fix(web):=20co=C3=BBt=20moyen=20mensuel=20calcu?=
+ =?UTF-8?q?l=C3=A9=20sur=20les=20jours=20couverts?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Une période annuelle du 14 nov. au 13 nov. touche 13 mois du calendrier
+(deux mois partiels) : le coût moyen était divisé par 13 au lieu de 12
+(68,85 € au lieu de 74,64 € pour 895,09 €), et le coût par jour était
+cette moyenne divisée par 30. Les moyennes sont maintenant calculées sur
+les jours couverts par des données (mois de 365,25 / 12 jours), et la
+carte indique l'équivalent en 11 prélèvements (mensualisation).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01EzrPxe6qXk5VAyNcnhyntt
+---
+ .../ConsumptionEuro/components/EuroCostCards.tsx      | 11 +++++++++--
+ .../ConsumptionEuro/hooks/useConsumptionEuroCalcs.ts  | 10 ++++++++--
+ .../web/src/pages/ConsumptionEuro/types/euro.types.ts |  5 +++++
+ 3 files changed, 22 insertions(+), 4 deletions(-)
+
+diff --git a/apps/web/src/pages/ConsumptionEuro/components/EuroCostCards.tsx b/apps/web/src/pages/ConsumptionEuro/components/EuroCostCards.tsx
+index bee4567..d0df371 100644
+--- a/apps/web/src/pages/ConsumptionEuro/components/EuroCostCards.tsx
++++ b/apps/web/src/pages/ConsumptionEuro/components/EuroCostCards.tsx
+@@ -34,6 +34,8 @@ export function EuroCostCards({ yearlyCosts, selectedOffer, isLoading }: EuroCos
+         year: year.year,
+         periodLabel: year.periodLabel,
+         totalCost: year.totalCost,
++        days: year.days,
++        avgDailyCost: year.avgDailyCost,
+         avgMonthlyCost: year.avgMonthlyCost,
+         consumptionCost: year.consumptionCost,
+         subscriptionCost: year.subscriptionCost,
+@@ -131,11 +133,16 @@ export function EuroCostCards({ yearlyCosts, selectedOffer, isLoading }: EuroCos
+             {formatCurrency(currentYear.avgMonthlyCost)}
+           </div>
+           <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+-            Sur {currentYear.months.length} mois
++            Sur {currentYear.days} jours ({(currentYear.days / (365.25 / 12)).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} mois)
+           </div>
+           <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+-            ≈ {formatCurrency(currentYear.avgMonthlyCost / 30)}/jour
++            ≈ {formatCurrency(currentYear.avgDailyCost)}/jour
+           </div>
++          {currentYear.days >= 300 && (
++            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
++              Mensualisé en 11 prélèvements : ≈ {formatCurrency((currentYear.avgDailyCost * 365.25) / 11)}
++            </div>
++          )}
+         </div>
+ 
+         {/* Consumption Cost Breakdown */}
+diff --git a/apps/web/src/pages/ConsumptionEuro/hooks/useConsumptionEuroCalcs.ts b/apps/web/src/pages/ConsumptionEuro/hooks/useConsumptionEuroCalcs.ts
+index 66efd54..81fdc18 100644
+--- a/apps/web/src/pages/ConsumptionEuro/hooks/useConsumptionEuroCalcs.ts
++++ b/apps/web/src/pages/ConsumptionEuro/hooks/useConsumptionEuroCalcs.ts
+@@ -348,6 +348,10 @@ export function useConsumptionEuroCalcs({
+       const hcCost = months.reduce((sum, m) => sum + m.hcCost, 0)
+       const hpCost = months.reduce((sum, m) => sum + m.hpCost, 0)
+       const totalCost = consumptionCost + subscriptionCost
++      // Moyennes sur les jours couverts : une période du 14 nov. au 13 nov. touche 13 mois du calendrier
++      // (deux mois partiels) mais ne compte que 12 mois de données
++      const days = months.reduce((sum, m) => sum + m.daysWithData, 0)
++      const MONTH_DAYS = 365.25 / 12
+ 
+       return {
+         year: period.label,
+@@ -361,8 +365,10 @@ export function useConsumptionEuroCalcs({
+         subscriptionCost,
+         hcCost,
+         hpCost,
+-        avgMonthlyCost: months.length > 0 ? totalCost / months.length : 0,
+-        avgMonthlyKwh: months.length > 0 ? totalKwh / months.length : 0
++        days,
++        avgDailyCost: days > 0 ? totalCost / days : 0,
++        avgMonthlyCost: days > 0 ? (totalCost / days) * MONTH_DAYS : 0,
++        avgMonthlyKwh: days > 0 ? (totalKwh / days) * MONTH_DAYS : 0
+       }
+     }).filter(p => p.months.length >= 1) // Include periods with at least 1 month of data
+ 
+diff --git a/apps/web/src/pages/ConsumptionEuro/types/euro.types.ts b/apps/web/src/pages/ConsumptionEuro/types/euro.types.ts
+index 9e39289..47b74af 100644
+--- a/apps/web/src/pages/ConsumptionEuro/types/euro.types.ts
++++ b/apps/web/src/pages/ConsumptionEuro/types/euro.types.ts
+@@ -61,6 +61,11 @@ export interface YearlyCost {
+   hcCost: number
+   hpCost: number
+   // Comparison data
++  /** Jours couverts par des données (une année complète = 365 ou 366) */
++  days: number
++  /** Coût moyen par jour couvert */
++  avgDailyCost: number
++  /** Coût moyen d'un mois de 30,44 jours (365,25 / 12), calculé sur les jours couverts */
+   avgMonthlyCost: number
+   avgMonthlyKwh: number
+ }
+-- 
+2.43.0
+
