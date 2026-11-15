@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.15.1.14
+
+- Page Consommation (€) : coût moyen mensuel calculé sur les jours couverts (12 mois au lieu de 13 pour une année du 14 au 13), vrai coût par jour, et équivalent en 11 prélèvements (mensualisation).
+
 ## 2.15.1.13
 
 - Courbe de charge activée récemment : les semaines NO_DATA d'avant la courbe disponible chez Enedis ne sont plus redemandées à chaque synchro (arrêt après 4 semaines vides d'affilée, nouvel essai après 7 jours). Après un redémarrage, l'export Home Assistant garde l'option de l'offre choisie (HC/HP) au lieu de celle de la passerelle (BASE), et retrouve ses prix (issue #48)
