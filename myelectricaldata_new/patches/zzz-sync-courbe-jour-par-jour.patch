@@ -1,0 +1,295 @@
+From 76b68fb9f14de39e61d622cdaf2fc393f8a6198e Mon Sep 17 00:00:00 2001
+From: Marlboro62 <195607976+Marlboro62@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 23:49:22 +0100
+Subject: [PATCH] fix(sync): courbe de charge, premiers jours et courbe d'avant
+ un long trou
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- La semaine NO_DATA collée à la courbe connue est redemandée jour par jour,
+  du plus récent au plus ancien : la passerelle répond NO_DATA pour toute une
+  semaine qui commence avant le début de la courbe, et ses derniers jours
+  n'étaient jamais récupérés.
+- Après NO_DATA_STREAK semaines vides, jusqu'à NO_DATA_PROBES sondes plus
+  anciennes (une semaine sur NO_DATA_STREAK) : une courbe séparée par un trou
+  plus long est retrouvée et la remontée continue.
+(issue hassio-addons#48)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01CSixJnFf4qBMac7uTfNvnW
+---
+ apps/api/src/services/sync.py                 | 121 +++++++++++++++++-
+ .../tests/unit/test_sync_courbe_no_data.py    |  88 ++++++++++++-
+ 2 files changed, 205 insertions(+), 4 deletions(-)
+
+diff --git a/apps/api/src/services/sync.py b/apps/api/src/services/sync.py
+index 9cf2c4b..c33cad8 100644
+--- a/apps/api/src/services/sync.py
++++ b/apps/api/src/services/sync.py
+@@ -65,6 +65,9 @@ NO_SERVICE_RETRY = timedelta(days=7)
+ # franchir un vrai trou (Linky hors ligne) sans s'arrêter ; même nouvel essai après NO_SERVICE_RETRY.
+ NO_DATA_CODE = "NO_DATA"
+ NO_DATA_STREAK = 4
++# Après ces semaines vides, quelques sondes plus anciennes (une semaine toutes les NO_DATA_STREAK) : une
++# courbe plus ancienne, séparée par un trou plus long, est encore retrouvée (issue hassio-addons#48)
++NO_DATA_PROBES = 6
+ NO_DATA_MARKER = "Courbe de charge absente chez Enedis avant le "
+ 
+ 
+@@ -1155,7 +1158,10 @@ class SyncService:
+                 # première semaine sans service (ADAM-ERR0191) arrête la remontée vers le passé
+                 chunks.reverse()
+ 
+-            for current_start, current_end in chunks:
++            index = 0
++            while index < len(chunks):
++                current_start, current_end = chunks[index]
++                index += 1
+                 try:
+                     response = await fetch_func(
+                         usage_point_id,
+@@ -1184,9 +1190,38 @@ class SyncService:
+                         break
+ 
+                     if granularity == DataGranularity.DETAILED and _is_no_data(response):
++                        if (
++                            latest_known is not None
++                            and current_end <= latest_known
++                            and (current_end - current_start).days > 1
++                            and await self._has_record_on(model_class, usage_point_id, granularity, current_end)
++                        ):
++                            # Semaine vide juste avant la courbe connue : la passerelle répond NO_DATA pour
++                            # toute la semaine quand elle commence avant le début de la courbe. Jour par jour,
++                            # du plus récent au plus ancien, pour récupérer les premiers jours de la courbe
++                            found, complete = await self._fetch_days_backward(
++                                fetch_func, usage_point_id, current_start, current_end, granularity, model_class
++                            )
++                            total_synced += found
++                            if complete:
++                                continue
+                         if latest_known is not None and current_end <= latest_known:
+                             no_data_streak.append(current_end)
+                             if len(no_data_streak) >= NO_DATA_STREAK:
++                                # Sondes plus anciennes avant d'arrêter : courbe séparée par un trou plus long
++                                resume, found = await self._probe_older_chunks(
++                                    fetch_func, usage_point_id, chunks, index - 1, granularity, model_class
++                                )
++                                total_synced += found
++                                if resume is not None:
++                                    logger.info(
++                                        f"[SYNC] {data_type}/{granularity.value} pour {usage_point_id} : courbe "
++                                        f"retrouvée avant le trou ({chunks[resume][0]} - {chunks[resume][1]}), "
++                                        f"remontée poursuivie."
++                                    )
++                                    no_data_streak.clear()
++                                    index = resume + 1
++                                    continue
+                                 # Courbe absente chez Enedis avant la plus récente de ces semaines vides
+                                 no_service_before = no_data_streak[0]
+                                 stop_marker = NO_DATA_MARKER
+@@ -1284,6 +1319,90 @@ class SyncService:
+             raise rate_limit_error
+         return total_synced
+ 
++    async def _has_record_on(
++        self,
++        model_class: type[ConsumptionData | ProductionData],
++        usage_point_id: str,
++        granularity: DataGranularity,
++        day: date,
++    ) -> bool:
++        """Au moins un relevé en base pour ce jour"""
++        result = await self.db.execute(
++            select(model_class.id).where(
++                and_(
++                    model_class.usage_point_id == usage_point_id,
++                    model_class.granularity == granularity,
++                    model_class.date == day,
++                )
++            ).limit(1)
++        )
++        return result.first() is not None
++
++    async def _fetch_days_backward(
++        self,
++        fetch_func: Any,
++        usage_point_id: str,
++        start: date,
++        end: date,
++        granularity: DataGranularity,
++        model_class: type[ConsumptionData | ProductionData],
++    ) -> tuple[int, bool]:
++        """Redemande la plage [start, end[ jour par jour, du plus récent au plus ancien
++
++        S'arrête au premier jour sans données (début de la courbe) ou en erreur.
++        Retourne (enregistrements stockés, True si tous les jours avaient des données).
++        """
++        found = 0
++        day = end - timedelta(days=1)
++        while day >= start:
++            response = await fetch_func(usage_point_id, day.isoformat(), (day + timedelta(days=1)).isoformat())
++            records = (
++                self._parse_meter_reading(response, usage_point_id, granularity)
++                if not (_is_no_data(response) or _is_no_service(response))
++                else []
++            )
++            if not records:
++                if found:
++                    logger.info(
++                        f"[SYNC] Courbe de charge de {usage_point_id} : {found} relevés récupérés jour par jour, "
++                        f"jusqu'au {day + timedelta(days=1)}"
++                    )
++                return found, False
++            await self._upsert_energy_records(records, model_class)
++            found += len(records)
++            day -= timedelta(days=1)
++        return found, True
++
++    async def _probe_older_chunks(
++        self,
++        fetch_func: Any,
++        usage_point_id: str,
++        chunks: list[tuple[date, date]],
++        position: int,
++        granularity: DataGranularity,
++        model_class: type[ConsumptionData | ProductionData],
++    ) -> tuple[int | None, int]:
++        """Sonde quelques semaines plus anciennes que chunks[position], espacées de NO_DATA_STREAK
++
++        Retourne (index de la première semaine sonde avec des données, ou None ; enregistrements stockés).
++        """
++        for step in range(1, NO_DATA_PROBES + 1):
++            probe = position + step * NO_DATA_STREAK
++            if probe >= len(chunks):
++                break
++            probe_start, probe_end = chunks[probe]
++            response = await fetch_func(usage_point_id, probe_start.isoformat(), probe_end.isoformat())
++            if _is_no_data(response):
++                continue
++            if _is_no_service(response):
++                break
++            records = self._parse_meter_reading(response, usage_point_id, granularity)
++            if not records:
++                break
++            await self._upsert_energy_records(records, model_class)
++            return probe, len(records)
++        return None, 0
++
+     def _parse_meter_reading(
+         self,
+         response: dict[str, Any],
+diff --git a/apps/api/tests/unit/test_sync_courbe_no_data.py b/apps/api/tests/unit/test_sync_courbe_no_data.py
+index c035dfe..d6dcaae 100644
+--- a/apps/api/tests/unit/test_sync_courbe_no_data.py
++++ b/apps/api/tests/unit/test_sync_courbe_no_data.py
+@@ -17,7 +17,14 @@ from src.models.base import Base
+ from src.models.client_mode import ConsumptionData, DataGranularity
+ from src.models.pdl import PDL
+ from src.models.user import User
+-from src.services.sync import NO_DATA_MARKER, NO_DATA_STREAK, SyncService, _is_no_data, _no_service_before
++from src.services.sync import (
++    NO_DATA_MARKER,
++    NO_DATA_PROBES,
++    NO_DATA_STREAK,
++    SyncService,
++    _is_no_data,
++    _no_service_before,
++)
+ 
+ PRM = "99999999999993"
+ NO_DATA = {"success": False, "error": {"code": "NO_DATA", "message": "No consumption data available for this period"}}
+@@ -77,9 +84,10 @@ async def test_semaines_no_data_avant_la_courbe_arretees(db: AsyncSession) -> No
+     await service._sync_consumption_detail(PRM)
+ 
+     weeks = asked_weeks(service)
+-    # La semaine récente d'abord, puis NO_DATA_STREAK semaines avant la courbe, au lieu de ~100
++    # La semaine récente d'abord, la semaine vide collée à la courbe aussi jour par jour (1 jour vide suffit),
++    # NO_DATA_STREAK semaines avant la courbe, puis NO_DATA_PROBES sondes : au lieu de ~100
+     assert weeks[0] > curve_start
+-    assert len(weeks) == 1 + NO_DATA_STREAK
++    assert len(weeks) == 1 + 1 + NO_DATA_STREAK + NO_DATA_PROBES
+     status = await service._get_or_create_sync_status(PRM, "consumption", DataGranularity.DETAILED)
+     assert status.error_message.startswith(NO_DATA_MARKER)
+     assert _no_service_before(status, datetime.now(UTC)) == curve_start
+@@ -119,3 +127,77 @@ async def test_sans_courbe_connue_aucun_arret(db: AsyncSession) -> None:
+     assert len(asked_weeks(service)) > NO_DATA_STREAK * 10
+     status = await service._get_or_create_sync_status(PRM, "consumption", DataGranularity.DETAILED)
+     assert not (status.error_message or "").startswith(NO_DATA_MARKER)
++
++
++def curve_response(first_day: date):
++    """Passerelle : NO_DATA pour une plage qui commence avant first_day, la courbe sinon"""
++
++    async def fetch(_prm: str, start: str, end: str) -> dict:
++        if date.fromisoformat(start) < first_day:
++            return NO_DATA
++        return {"success": True, "data": {"start": start, "end": end}}
++
++    return fetch
++
++
++def parse_one_per_day(response: dict, usage_point_id: str, granularity: DataGranularity) -> list[dict]:
++    """Un relevé par jour demandé (remplace l'analyse du format Enedis)"""
++    if response.get("success") is not True:
++        return []
++    day, end = date.fromisoformat(response["data"]["start"]), date.fromisoformat(response["data"]["end"])
++    records = []
++    while day < end:
++        records.append({
++            "usage_point_id": usage_point_id, "date": day, "granularity": granularity,
++            "interval_start": "00:00", "value": 500, "source": "myelectricaldata", "raw_data": {},
++        })
++        day += timedelta(days=1)
++    return records
++
++
++async def known_days(db: AsyncSession) -> set[date]:
++    from sqlalchemy import select
++
++    rows = await db.execute(select(ConsumptionData.date).where(ConsumptionData.usage_point_id == PRM))
++    return {row[0] for row in rows}
++
++
++async def test_premiers_jours_de_la_courbe_recuperes_jour_par_jour(db: AsyncSession) -> None:
++    """La semaine qui commence avant la courbe répond NO_DATA en entier : ses derniers jours sont repris"""
++    today = date.today()
++    first_day = today - timedelta(days=12)
++    await add_curve(db, today - timedelta(days=8), today - timedelta(days=1))  # 4 premiers jours manquants
++    service = make_service(db)
++    service.adapter.get_consumption_detail = AsyncMock(side_effect=curve_response(first_day))
++    service._parse_meter_reading = parse_one_per_day
++
++    await service._sync_consumption_detail(PRM)
++
++    days = await known_days(db)
++    assert all(first_day + timedelta(days=n) in days for n in range(4))
++    assert first_day - timedelta(days=1) not in days
++
++
++async def test_courbe_retrouvee_apres_un_long_trou(db: AsyncSession) -> None:
++    """Un trou plus long que NO_DATA_STREAK semaines : une sonde retrouve la courbe plus ancienne"""
++    today = date.today()
++    await add_curve(db, today - timedelta(days=30), today - timedelta(days=1))
++    gap_end = today - timedelta(days=30)
++    gap_start = gap_end - timedelta(weeks=NO_DATA_STREAK + 2)  # trou de 6 semaines
++    old_start = gap_start - timedelta(weeks=20)
++
++    async def fetch(_prm: str, start: str, end: str) -> dict:
++        s, e = date.fromisoformat(start), date.fromisoformat(end)
++        if old_start <= s and e <= gap_start:
++            return {"success": True, "data": {"start": start, "end": end}}
++        return NO_DATA
++
++    service = make_service(db)
++    service.adapter.get_consumption_detail = AsyncMock(side_effect=fetch)
++    service._parse_meter_reading = parse_one_per_day
++
++    await service._sync_consumption_detail(PRM)
++
++    days = await known_days(db)
++    assert min(days) < gap_start  # courbe d'avant le trou retrouvée par une sonde
++    assert old_start + timedelta(days=7) in days  # remontée poursuivie au-delà de la sonde
+-- 
+2.43.0
+
