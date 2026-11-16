@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.15.2
+
+- Basé sur MyElectricalData 2.15.2 : [notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.15.2).
+
 ## 2.15.1.14
 
 - Page Consommation (€) : coût moyen mensuel calculé sur les jours couverts (12 mois au lieu de 13 pour une année du 14 au 13), vrai coût par jour, et équivalent en 11 prélèvements (mensualisation).
