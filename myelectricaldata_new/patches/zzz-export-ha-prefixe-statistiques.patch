@@ -1,0 +1,115 @@
+From ef3fb793806a7e66958869c0485f08501c58175c Mon Sep 17 00:00:00 2001
+From: Marlboro62 <195607976+Marlboro62@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 23:49:22 +0100
+Subject: [PATCH] =?UTF-8?q?fix(export):=20pr=C3=A9fixe=20des=20statistique?=
+ =?UTF-8?q?s=20Home=20Assistant=20nettoy=C3=A9?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Une espace finale dans le préfixe (« myelectricaldata ») rendait chaque
+identifiant de statistique invalide : tout l'import du tableau Énergie
+échouait (Invalid statistic_id). Le préfixe est désormais débarrassé des
+espaces, mis en minuscules et ses caractères invalides remplacés par « _ »,
+côté API comme à l'enregistrement dans l'interface (issue hassio-addons#48).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01CSixJnFf4qBMac7uTfNvnW
+---
+ apps/api/src/routers/export.py                |  4 ++--
+ .../src/services/exporters/home_assistant.py  | 19 +++++++++++++++----
+ apps/web/src/pages/HomeAssistant.tsx          |  2 +-
+ 3 files changed, 18 insertions(+), 7 deletions(-)
+
+diff --git a/apps/api/src/routers/export.py b/apps/api/src/routers/export.py
+index 5ab71f9..40e0b2d 100644
+--- a/apps/api/src/routers/export.py
++++ b/apps/api/src/routers/export.py
+@@ -1004,11 +1004,11 @@ async def list_ha_statistics(
+     if config.export_type != ExportType.HOME_ASSISTANT:
+         raise HTTPException(status_code=400, detail="This endpoint is only for Home Assistant exports")
+ 
+-    from ..services.exporters.home_assistant import HomeAssistantExporter
++    from ..services.exporters.home_assistant import HomeAssistantExporter, statistic_prefix
+ 
+     try:
+         exporter = HomeAssistantExporter(config.config)
+-        prefix = config.config.get("statistic_id_prefix", "myelectricaldata")
++        prefix = statistic_prefix(config.config)
+         result = await exporter.list_statistics(prefix)
+ 
+         return {
+diff --git a/apps/api/src/services/exporters/home_assistant.py b/apps/api/src/services/exporters/home_assistant.py
+index 216b9aa..0cb5ca8 100644
+--- a/apps/api/src/services/exporters/home_assistant.py
++++ b/apps/api/src/services/exporters/home_assistant.py
+@@ -252,6 +252,17 @@ ENTITY_WORDS: dict[str, dict[str, str]] = {
+ SOFTWARE_VERSION = "1.8.0"
+ 
+ 
++def statistic_prefix(config: dict[str, Any] | None) -> str:
++    """Préfixe des statistiques HA nettoyé : sans espaces autour, minuscules, caractères invalides en « _ »
++
++    Un identifiant de statistique n'accepte que [a-z0-9_] avant les deux-points : une espace finale
++    (« myelectricaldata  ») faisait échouer tout l'import (Invalid statistic_id, issue hassio-addons#48).
++    """
++    raw = str((config or {}).get("statistic_id_prefix") or "").strip().lower()
++    cleaned = re.sub(r"_+", "_", re.sub(r"[^a-z0-9_]", "_", raw)).strip("_")
++    return cleaned or "myelectricaldata"
++
++
+ def _ha_version_at_least(version: str | None, major: int, minor: int) -> bool:
+     """Vrai si la version de Home Assistant est >= major.minor (version inconnue : vrai)."""
+     parts = str(version or "").split(".")
+@@ -3565,7 +3576,7 @@ class HomeAssistantExporter(BaseExporter):
+         if not self._has_websocket_config():
+             return failure("Configuration WebSocket manquante (ha_url, ha_token)")
+ 
+-        prefix = self.config.get("statistic_id_prefix", "myelectricaldata")
++        prefix = statistic_prefix(self.config)
+ 
+         # First, list all statistics with our prefix
+         list_result = await self.list_statistics(prefix)
+@@ -3902,7 +3913,7 @@ class HomeAssistantExporter(BaseExporter):
+                 "message": "Configuration WebSocket manquante (ha_url, ha_token)",
+             }
+ 
+-        prefix = self.config.get("statistic_id_prefix", "myelectricaldata")
++        prefix = statistic_prefix(self.config)
+ 
+         # If no specific IDs provided, get all with prefix
+         if statistic_ids is None:
+@@ -4021,7 +4032,7 @@ class HomeAssistantExporter(BaseExporter):
+                 "message": "Configuration WebSocket manquante (ha_url, ha_token)",
+             }
+ 
+-        prefix = self.config.get("statistic_id_prefix", "myelectricaldata")
++        prefix = statistic_prefix(self.config)
+ 
+         # Incremental mode: resume point (date and HA sum) of each statistic, see _read_incremental_state
+         since_date: datetime | None = None
+@@ -4254,7 +4265,7 @@ class HomeAssistantExporter(BaseExporter):
+                 "message": "Configuration WebSocket manquante (ha_url, ha_token)",
+             }
+ 
+-        prefix = self.config.get("statistic_id_prefix", "myelectricaldata")
++        prefix = statistic_prefix(self.config)
+ 
+         # Helper pour envoyer les événements de progression
+         async def emit_progress(
+diff --git a/apps/web/src/pages/HomeAssistant.tsx b/apps/web/src/pages/HomeAssistant.tsx
+index f019df0..aeb137c 100644
+--- a/apps/web/src/pages/HomeAssistant.tsx
++++ b/apps/web/src/pages/HomeAssistant.tsx
+@@ -504,7 +504,7 @@ export default function HomeAssistant() {
+         // WebSocket API config
+         ha_url: haUrl,
+         ha_token: haToken,
+-        statistic_id_prefix: statisticIdPrefix,
++        statistic_id_prefix: statisticIdPrefix.trim() || 'myelectricaldata',
+         energy_enabled: energyExportEnabled,
+         // Energy Dashboard import settings
+         sync_delay_ms: syncDelayMs,
+-- 
+2.43.0
+
