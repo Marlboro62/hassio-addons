@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.15.2.1
+
+- Préfixe des statistiques HA nettoyé (espace finale) ; courbe de charge : premiers jours repris jour par jour et courbe retrouvée après un long trou (issue #48)
+
 ## 2.15.2
 
 - Basé sur MyElectricalData 2.15.2 : [notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.15.2).
