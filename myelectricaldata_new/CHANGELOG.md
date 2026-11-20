@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.15.2.2
+
+- Courbe de charge : l'état de synchro garde la cause de l'arrêt (courbe absente, NO_DATA) au lieu d'afficher « non souscrite » aux synchros suivantes (issue #48)
+
 ## 2.15.2.1
 
 - Préfixe des statistiques HA nettoyé (espace finale) ; courbe de charge : premiers jours repris jour par jour et courbe retrouvée après un long trou (issue #48)
