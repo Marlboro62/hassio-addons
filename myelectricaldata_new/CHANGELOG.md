@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.15.2.3
+
+- Passerelle indisponible (maintenance, 503) : message clair « Passerelle MyElectricalData indisponible (HTTP 503 …) » au lieu de « Expecting value: line 1 column 1 (char 0) », et statut HTTP conservé (404 Zen Flex ignoré, 403 des PDL partagés reconnu)
+
 ## 2.15.2.2
 
 - Courbe de charge : l'état de synchro garde la cause de l'arrêt (courbe absente, NO_DATA) au lieu d'afficher « non souscrite » aux synchros suivantes (issue #48)
