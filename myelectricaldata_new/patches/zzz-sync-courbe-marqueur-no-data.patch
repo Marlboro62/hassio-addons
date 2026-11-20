@@ -1,0 +1,81 @@
+From c83f3b0397b263656e9049a778360ec99324bca4 Mon Sep 17 00:00:00 2001
+From: Marlboro62 <195607976+Marlboro62@users.noreply.github.com>
+Date: Fri, 20 Nov 2026 05:51:20 +0100
+Subject: [PATCH] =?UTF-8?q?fix(sync):=20l'arr=C3=AAt=20NO=5FDATA=20de=20la?=
+ =?UTF-8?q?=20courbe=20garde=20sa=20cause=20aux=20synchros=20suivantes?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Un arrêt NO_DATA mémorisé (« Courbe de charge absente chez Enedis avant le »)
+était réécrit à la synchro suivante avec le marqueur ADAM-ERR0191 (« non
+souscrite »), car stop_marker repartait de NO_SERVICE_MARKER. Le
+comportement ne changeait pas (les deux marqueurs bornent la synchro de la
+même façon), mais l'état de synchro affichait une cause fausse.
+(issue hassio-addons#48)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ apps/api/src/services/sync.py                 |  9 +++++++-
+ .../tests/unit/test_sync_courbe_no_data.py    | 21 +++++++++++++++++++
+ 2 files changed, 29 insertions(+), 1 deletion(-)
+
+diff --git a/apps/api/src/services/sync.py b/apps/api/src/services/sync.py
+index c33cad8..769c681 100644
+--- a/apps/api/src/services/sync.py
++++ b/apps/api/src/services/sync.py
+@@ -1128,7 +1128,13 @@ class SyncService:
+         total_synced = 0
+         errors = []
+         rate_limit_error: RateLimitExceededError | None = None
+-        stop_marker = NO_SERVICE_MARKER
++        # Arrêt déjà mémorisé : il est réécrit en fin de synchro avec sa cause d'origine (NO_DATA reste
++        # « absente », pas « non souscrite ») (issue hassio-addons#48)
++        stop_marker = (
++            NO_DATA_MARKER
++            if no_service_before and (sync_status.error_message or "").startswith(NO_DATA_MARKER)
++            else NO_SERVICE_MARKER
++        )
+         # Courbe déjà connue en base : une semaine NO_DATA plus ancienne précède la courbe d'Enedis.
+         # Les semaines récentes sans données (pas encore publiées) ne comptent pas
+         latest_known: date | None = None
+@@ -1181,6 +1187,7 @@ class SyncService:
+                         # Aucune courbe de charge souscrite jusqu'à cette semaine : les semaines plus
+                         # anciennes ne le sont pas non plus, inutile de les demander
+                         no_service_before = current_end
++                        stop_marker = NO_SERVICE_MARKER
+                         sync_status.last_error_at = datetime.now(UTC)
+                         logger.warning(
+                             f"[SYNC] {data_type}/{granularity.value} pour {usage_point_id} : courbe de charge "
+diff --git a/apps/api/tests/unit/test_sync_courbe_no_data.py b/apps/api/tests/unit/test_sync_courbe_no_data.py
+index d6dcaae..13a3a76 100644
+--- a/apps/api/tests/unit/test_sync_courbe_no_data.py
++++ b/apps/api/tests/unit/test_sync_courbe_no_data.py
+@@ -201,3 +201,24 @@ async def test_courbe_retrouvee_apres_un_long_trou(db: AsyncSession) -> None:
+     days = await known_days(db)
+     assert min(days) < gap_start  # courbe d'avant le trou retrouvée par une sonde
+     assert old_start + timedelta(days=7) in days  # remontée poursuivie au-delà de la sonde
++
++
++async def test_arret_no_data_garde_sa_cause_aux_synchros_suivantes(db: AsyncSession) -> None:
++    """L'arrêt NO_DATA mémorisé restait « absente » une seule synchro, puis devenait « non souscrite »"""
++    today = date.today()
++    curve_start = today - timedelta(days=140)
++    await add_curve(db, curve_start, today - timedelta(days=4))  # jours récents pas encore publiés
++    service = make_service(db)
++
++    await service._sync_consumption_detail(PRM)
++    status = await service._get_or_create_sync_status(PRM, "consumption", DataGranularity.DETAILED)
++    assert status.error_message.startswith(NO_DATA_MARKER)
++    stopped_at = status.last_error_at
++
++    # Synchro suivante : jour récent manquant, l'arrêt mémorisé est réécrit
++    service.adapter.get_consumption_detail.reset_mock()
++    await service._sync_consumption_detail(PRM)
++    status = await service._get_or_create_sync_status(PRM, "consumption", DataGranularity.DETAILED)
++    assert status.error_message.startswith(NO_DATA_MARKER)
++    assert _no_service_before(status, datetime.now(UTC)) == curve_start
++    assert status.last_error_at == stopped_at  # nouvel essai toujours 7 jours après l'arrêt
+-- 
+2.55.0.windows.5
+
