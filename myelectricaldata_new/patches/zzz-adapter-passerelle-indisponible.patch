@@ -1,0 +1,154 @@
+From 772270f9b77a29525ce3f4fe30934ddd34057a05 Mon Sep 17 00:00:00 2001
+From: Marlboro62 <195607976+Marlboro62@users.noreply.github.com>
+Date: Fri, 20 Nov 2026 06:11:59 +0100
+Subject: [PATCH] =?UTF-8?q?fix(adapter):=20passerelle=20indisponible,=20me?=
+ =?UTF-8?q?ssage=20lisible=20et=20statut=20HTTP=20conserv=C3=A9?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Quand la passerelle répond une page HTML (503 de nginx pendant une
+maintenance), la lecture JSON du corps échouait et son erreur « Expecting
+value: line 1 column 1 (char 0) » remplaçait le refus HTTP : message
+incompréhensible dans les logs, et statut perdu pour les appelants (404 de
+Zen Flex ignoré, 403 des PDL partagés).
+
+GatewayHTTPError, sous-classe de httpx.HTTPStatusError, porte désormais un
+message clair (« Passerelle MyElectricalData indisponible (HTTP 503 ...) »)
+et la page HTML n'est plus journalisée en entier.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ apps/api/src/adapters/myelectricaldata.py     | 38 +++++++++---
+ .../test_adapter_passerelle_indisponible.py   | 59 +++++++++++++++++++
+ 2 files changed, 89 insertions(+), 8 deletions(-)
+ create mode 100644 apps/api/tests/unit/test_adapter_passerelle_indisponible.py
+
+diff --git a/apps/api/src/adapters/myelectricaldata.py b/apps/api/src/adapters/myelectricaldata.py
+index e26816d..edda070 100644
+--- a/apps/api/src/adapters/myelectricaldata.py
++++ b/apps/api/src/adapters/myelectricaldata.py
+@@ -34,6 +34,24 @@ class RateLimitExceededError(Exception):
+         self.retry_after = retry_after
+ 
+ 
++class GatewayHTTPError(httpx.HTTPStatusError):
++    """Refus HTTP de la passerelle sans corps JSON (page HTML de nginx pendant une maintenance, proxy...).
++
++    Reste un HTTPStatusError (statut toujours reconnu par les appelants), avec un message lisible au lieu
++    de l'erreur de lecture JSON « Expecting value: line 1 column 1 (char 0) ».
++    """
++
++
++def _gateway_http_error(error: httpx.HTTPStatusError) -> GatewayHTTPError:
++    response = error.response
++    status = f"HTTP {response.status_code} {response.reason_phrase}".strip()
++    if response.status_code >= 500:
++        message = f"Passerelle MyElectricalData indisponible ({status}), nouvel essai à la prochaine synchro"
++    else:
++        message = f"Passerelle MyElectricalData : requête refusée ({status})"
++    return GatewayHTTPError(message, request=error.request, response=response)
++
++
+ def _quota_refusal(body: Any) -> str | None:
+     """Message du refus de quota porté par une réponse 200 de la passerelle, None sinon.
+ 
+@@ -177,18 +195,22 @@ class MyElectricalDataAdapter:
+                     msg = e.response.text
+                 raise RateLimitExceededError(message=f"Rate limit exceeded (HTTP 429): {msg}", retry_after=retry_after) from e
+ 
++            try:
++                error_data = e.response.json()
++            except ValueError:
++                # Corps non JSON (page HTML d'un 503 nginx...) : l'erreur de lecture JSON masquait le statut HTTP
++                gateway_error = _gateway_http_error(e)
++                logger.error(f"[MED] {gateway_error}")
++                raise gateway_error from e
++
+             logger.error(f"[MED] API error: {e.response.status_code}")
+             logger.error(f"[MED] Response: {e.response.text}")
+ 
+             # Try to parse error response
+-            try:
+-                error_data = e.response.json()
+-                if "error" in error_data:
+-                    raise ValueError(
+-                        f"{error_data.get('error')}: {error_data.get('error_description', '')}"
+-                    ) from e
+-            except (KeyError, TypeError):
+-                pass
++            if isinstance(error_data, dict) and "error" in error_data:
++                raise ValueError(
++                    f"{error_data.get('error')}: {error_data.get('error_description', '')}"
++                ) from e
+ 
+             raise
+         except Exception as e:
+diff --git a/apps/api/tests/unit/test_adapter_passerelle_indisponible.py b/apps/api/tests/unit/test_adapter_passerelle_indisponible.py
+new file mode 100644
+index 0000000..46b9c7c
+--- /dev/null
++++ b/apps/api/tests/unit/test_adapter_passerelle_indisponible.py
+@@ -0,0 +1,59 @@
++"""Passerelle en maintenance : page HTML de nginx au lieu de JSON (issue hassio-addons#48, logs du 20/11).
++
++L'erreur de lecture JSON « Expecting value: line 1 column 1 (char 0) » remplaçait le refus HTTP :
++message incompréhensible, et statut perdu pour les appelants (404 Zen Flex, 403 des PDL partagés).
++"""
++
++import httpx
++import pytest
++from unittest.mock import AsyncMock
++
++from src.adapters.myelectricaldata import GatewayHTTPError, MyElectricalDataAdapter
++from src.routers.sync import _gateway_error
++
++PAGE_NGINX = (
++    "<html><head><title>503 Service Temporarily Unavailable</title></head><body>"
++    "<center><h1>503 Service Temporarily Unavailable</h1></center><hr><center>nginx</center></body></html>"
++)
++
++
++def make_adapter(response: httpx.Response) -> MyElectricalDataAdapter:
++    adapter = MyElectricalDataAdapter()
++    adapter.base_url = "https://passerelle.example/api"
++    adapter._ensure_authenticated = AsyncMock(return_value="jeton")
++    client = httpx.AsyncClient(transport=httpx.MockTransport(lambda request: response))
++    adapter.get_client = AsyncMock(return_value=client)
++    return adapter
++
++
++async def test_page_html_503_message_lisible() -> None:
++    adapter = make_adapter(httpx.Response(503, text=PAGE_NGINX, headers={"Content-Type": "text/html"}))
++
++    with pytest.raises(GatewayHTTPError) as excinfo:
++        await adapter._make_request("GET", "/tempo/days")
++
++    assert isinstance(excinfo.value, httpx.HTTPStatusError)
++    assert excinfo.value.response.status_code == 503
++    message = str(excinfo.value)
++    assert "Passerelle MyElectricalData indisponible" in message
++    assert "HTTP 503 Service Unavailable" in message
++    assert "Expecting value" not in message
++
++
++@pytest.mark.parametrize("status", [401, 403])
++async def test_refus_html_garde_son_statut(status: int) -> None:
++    adapter = make_adapter(httpx.Response(status, text="<html>refus</html>"))
++
++    with pytest.raises(GatewayHTTPError) as excinfo:
++        await adapter._make_request("GET", "/admin/shared-pdls")
++
++    assert "requête refusée" in str(excinfo.value)
++    # L'écran des PDL partagés reconnaît de nouveau le compte non administrateur
++    assert _gateway_error(excinfo.value).status_code == 403
++
++
++async def test_erreur_json_inchangee() -> None:
++    adapter = make_adapter(httpx.Response(400, json={"error": "invalid_request", "error_description": "dates"}))
++
++    with pytest.raises(ValueError, match="invalid_request: dates"):
++        await adapter._make_request("GET", "/enedis/consumption")
+-- 
+2.55.0.windows.5
+
