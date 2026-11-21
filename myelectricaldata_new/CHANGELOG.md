@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.15.3
+
+- Basé sur MyElectricalData 2.15.3 : [notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.15.3).
+
 ## 2.15.2.3
 
 - Passerelle indisponible (maintenance, 503) : message clair « Passerelle MyElectricalData indisponible (HTTP 503 …) » au lieu de « Expecting value: line 1 column 1 (char 0) », et statut HTTP conservé (404 Zen Flex ignoré, 403 des PDL partagés reconnu)
