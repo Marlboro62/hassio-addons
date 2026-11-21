@@ -1,0 +1,57 @@
+diff --git a/apps/web/src/main.tsx b/apps/web/src/main.tsx
+index 5df107c..3aeaff1 100644
+--- a/apps/web/src/main.tsx
++++ b/apps/web/src/main.tsx
+@@ -60,6 +60,13 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
+               return false
+             }
+ 
++            // Ne pas persister les configurations d'export : après une réinstallation (base neuve),
++            // l'ancienne configuration restait affichée et son identifiant donnait des 404
++            // (enregistrement, test et lancement de l'export Home Assistant, MQTT, VictoriaMetrics)
++            if (queryKey === 'export-configs') {
++              return false
++            }
++
+             // Don't persist energy providers/offers - they change when scrapers run
+             // and must always be fresh from the server to avoid stale cache issues
+             if (queryKey === 'energy-providers' || queryKey === 'energy-offers' || queryKey === 'energy-providers-with-scrapers' || queryKey === 'sync-status') {
+diff --git a/apps/web/src/pages/HomeAssistant.tsx b/apps/web/src/pages/HomeAssistant.tsx
+index 7f9fc78..adc210a 100644
+--- a/apps/web/src/pages/HomeAssistant.tsx
++++ b/apps/web/src/pages/HomeAssistant.tsx
+@@ -348,6 +348,8 @@ export default function HomeAssistant() {
+   const { data: configsResponse, isLoading } = useQuery({
+     queryKey: ['export-configs'],
+     queryFn: () => exportApi.listConfigs(),
++    // Toujours relue à l'ouverture de la page : la configuration peut avoir changé côté serveur
++    staleTime: 0,
+   })
+ 
+   // Query PDLs for entity list
+diff --git a/apps/web/src/pages/MQTT.tsx b/apps/web/src/pages/MQTT.tsx
+index 74b96f5..26817c5 100644
+--- a/apps/web/src/pages/MQTT.tsx
++++ b/apps/web/src/pages/MQTT.tsx
+@@ -66,6 +66,8 @@ export default function MQTT() {
+   const { data: configsResponse, isLoading } = useQuery({
+     queryKey: ['export-configs'],
+     queryFn: () => exportApi.listConfigs(),
++    // Toujours relue à l'ouverture de la page : la configuration peut avoir changé côté serveur
++    staleTime: 0,
+   })
+ 
+   // Find existing MQTT config
+diff --git a/apps/web/src/pages/VictoriaMetrics.tsx b/apps/web/src/pages/VictoriaMetrics.tsx
+index aeb46db..07171bf 100644
+--- a/apps/web/src/pages/VictoriaMetrics.tsx
++++ b/apps/web/src/pages/VictoriaMetrics.tsx
+@@ -61,6 +61,8 @@ export default function VictoriaMetrics() {
+   const { data: configsResponse, isLoading } = useQuery({
+     queryKey: ['export-configs'],
+     queryFn: () => exportApi.listConfigs(),
++    // Toujours relue à l'ouverture de la page : la configuration peut avoir changé côté serveur
++    staleTime: 0,
+   })
+ 
+   // Find existing VictoriaMetrics config

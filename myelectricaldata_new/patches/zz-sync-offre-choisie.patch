@@ -1,0 +1,106 @@
+From e0bc5d3309e16130c20655ff5cb82d2413685760 Mon Sep 17 00:00:00 2001
+From: Marlboro62 <195607976+Marlboro62@users.noreply.github.com>
+Date: Fri, 13 Nov 2026 21:06:14 +0000
+Subject: [PATCH 2/2] =?UTF-8?q?fix(sync):=20l'offre=20choisie=20garde=20so?=
+ =?UTF-8?q?n=20option=20tarifaire=20apr=C3=A8s=20un=20red=C3=A9marrage?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Au démarrage, la synchro des PDL recopiait l'option de la passerelle
+(souvent BASE) sur un PDL dont l'offre choisie est HC/HP : l'export HA
+passait en BASE et ne trouvait plus de prix (« No prices found in offer »),
+jusqu'à une nouvelle sélection de l'offre. L'offre choisie, du catalogue
+comme aux prix saisis, fixe maintenant l'option, comme à sa sélection
+(issue hassio-addons#48).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01EzrPxe6qXk5VAyNcnhyntt
+---
+ apps/api/src/services/sync.py             | 14 ++++++-----
+ apps/api/tests/unit/test_custom_offers.py | 29 +++++++++++++++++++++--
+ 2 files changed, 35 insertions(+), 8 deletions(-)
+
+diff --git a/apps/api/src/services/sync.py b/apps/api/src/services/sync.py
+index 5d4d041..9cf2c4b 100644
+--- a/apps/api/src/services/sync.py
++++ b/apps/api/src/services/sync.py
+@@ -182,12 +182,12 @@ class SyncService:
+         self.db = db
+         self.adapter = get_med_adapter()
+ 
+-    async def _custom_offer_type(self, offer_id: str | None) -> str | None:
+-        """Type de l'offre choisie si c'est une offre aux prix saisis, sinon None"""
++    async def _selected_offer_type(self, offer_id: str | None) -> str | None:
++        """Type de l'offre choisie dans le client (catalogue ou prix saisis), sinon None"""
+         if not offer_id:
+             return None
+         offer = await self.db.get(EnergyOffer, offer_id)
+-        if offer is None or not is_custom_provider(offer.provider_id):
++        if offer is None or not offer.offer_type:
+             return None
+         return str(offer.offer_type)
+ 
+@@ -195,10 +195,12 @@ class SyncService:
+         """Recopie sur un PDL local les champs servis par la passerelle (PDL du compte ou partagé)."""
+         pdl.name = remote.get("name", pdl.name)
+         pdl.subscribed_power = remote.get("subscribed_power")
+-        # Une offre aux prix saisis fixe l'option : on la saisit justement quand le contrat
+-        # diffère de la passerelle
++        # L'offre choisie dans le client fixe l'option, comme à sa sélection (routers/pdl.py) : ses prix
++        # (HC/HP, Tempo…) n'ont de sens qu'avec ses séries. Sans elle, l'option de la passerelle
++        # (souvent BASE) remplaçait à chaque démarrage celle de l'offre, et l'export HA ne trouvait plus
++        # de prix (« No prices found in offer »)
+         pdl.pricing_option = (
+-            await self._custom_offer_type(pdl.selected_offer_id)
++            await self._selected_offer_type(pdl.selected_offer_id)
+             or remote.get("pricing_option")
+         )
+         pdl.has_consumption = remote.get("has_consumption", True)
+diff --git a/apps/api/tests/unit/test_custom_offers.py b/apps/api/tests/unit/test_custom_offers.py
+index 428ec5e..f4d82b6 100644
+--- a/apps/api/tests/unit/test_custom_offers.py
++++ b/apps/api/tests/unit/test_custom_offers.py
+@@ -192,7 +192,7 @@ async def test_la_synchro_des_pdl_garde_l_option_d_une_offre_saisie(db):
+                selected_offer_id=custom["id"], pricing_option="BASE"))
+     db.add(PDL(id=str(uuid.uuid4()), usage_point_id="22222222222222", user_id="user-1",
+                selected_offer_id=custom["id"], pricing_option="BASE"))
+-    # Témoin : offre de la passerelle, la passerelle reste maîtresse de l'option (comportement inchangé)
++    # Offre du catalogue (issue hassio-addons#48) : son option garde elle aussi la main sur la passerelle
+     db.add(PDL(id=str(uuid.uuid4()), usage_point_id="33333333333333", user_id="user-1",
+                selected_offer_id="zen-fixe", pricing_option="BASE"))
+     await db.commit()
+@@ -208,4 +208,29 @@ async def test_la_synchro_des_pdl_garde_l_option_d_une_offre_saisie(db):
+     await service.sync_pdl_list("user-1")
+ 
+     options = {p.usage_point_id: p.pricing_option for p in (await db.execute(select(PDL))).scalars()}
+-    assert options == {"11111111111111": "BASE", "22222222222222": "BASE", "33333333333333": "HC_HP"}
++    assert options == {"11111111111111": "BASE", "22222222222222": "BASE", "33333333333333": "BASE"}
++
++
++async def test_la_synchro_des_pdl_garde_l_option_de_l_offre_du_catalogue(db):
++    """Issue hassio-addons#48 : offre EDF Tarif Bleu HC/HP choisie, passerelle en BASE. Après un
++    redémarrage, l'option repassait en BASE et l'export HA ne trouvait plus de prix."""
++    db.add(EnergyProvider(id="edf", name="EDF"))
++    db.add(EnergyOffer(id="tarif-bleu-hc", provider_id="edf", name="Tarif Bleu", offer_type="HC_HP",
++                       subscription_price=Decimal("20.00"), hc_price=Decimal("0.17"), hp_price=Decimal("0.21")))
++    db.add(PDL(id=str(uuid.uuid4()), usage_point_id="44444444444444", user_id="user-1",
++               selected_offer_id="tarif-bleu-hc", pricing_option="HC_HP"))
++    # Sans offre choisie : la passerelle reste maîtresse de l'option
++    db.add(PDL(id=str(uuid.uuid4()), usage_point_id="55555555555555", user_id="user-1", pricing_option="BASE"))
++    await db.commit()
++
++    service = SyncService.__new__(SyncService)
++    service.db = db
++    service.adapter = SimpleNamespace(get_usage_points=AsyncMock(return_value={"usage_points": [
++        {"usage_point_id": "44444444444444", "pricing_option": "BASE"},
++        {"usage_point_id": "55555555555555", "pricing_option": "HC_HP"},
++    ]}), set_shared_owners=MagicMock())
++
++    await service.sync_pdl_list("user-1")
++
++    options = {p.usage_point_id: p.pricing_option for p in (await db.execute(select(PDL))).scalars()}
++    assert options == {"44444444444444": "HC_HP", "55555555555555": "HC_HP"}
+-- 
+2.43.0
+

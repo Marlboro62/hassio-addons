@@ -1,15 +1,84 @@
 # Changelog
 
+## 2.15.3
+
+- Basé sur MyElectricalData 2.15.3 : [notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.15.3).
+
+## 2.15.2.3
+
+- Passerelle indisponible (maintenance, 503) : message clair « Passerelle MyElectricalData indisponible (HTTP 503 …) » au lieu de « Expecting value: line 1 column 1 (char 0) », et statut HTTP conservé (404 Zen Flex ignoré, 403 des PDL partagés reconnu)
+
+## 2.15.2.2
+
+- Courbe de charge : l'état de synchro garde la cause de l'arrêt (courbe absente, NO_DATA) au lieu d'afficher « non souscrite » aux synchros suivantes (issue #48)
+
+## 2.15.2.1
+
+- Préfixe des statistiques HA nettoyé (espace finale) ; courbe de charge : premiers jours repris jour par jour et courbe retrouvée après un long trou (issue #48)
+
+## 2.15.2
+
+- Basé sur MyElectricalData 2.15.2 : [notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.15.2).
+
+## 2.15.1.14
+
+- Page Consommation (€) : coût moyen mensuel calculé sur les jours couverts (12 mois au lieu de 13 pour une année du 14 au 13), vrai coût par jour, et équivalent en 11 prélèvements (mensualisation).
+
+## 2.15.1.13
+
+- Courbe de charge activée récemment : les semaines NO_DATA d'avant la courbe disponible chez Enedis ne sont plus redemandées à chaque synchro (arrêt après 4 semaines vides d'affilée, nouvel essai après 7 jours). Après un redémarrage, l'export Home Assistant garde l'option de l'offre choisie (HC/HP) au lieu de celle de la passerelle (BASE), et retrouve ses prix (issue #48)
+
+## 2.15.1.12
+
+- Carte Linky (capteur sensor.myelectricaldata_linky_<pdl>_consumption) : HC + HP valaient le double de la consommation du jour avec une courbe au pas de 15 min ou un créneau enregistré en double ; énergie calculée selon le pas réel de la courbe (issue content-card-linky-new#13, PR amont #219)
+
+## 2.15.1.11
+
+- Interface : mention BÊTA à côté du numéro de version, en bas à gauche, pour distinguer la bêta de la version stable
+
+## 2.15.1.10
+
+- Heures creuses saisonnières : sans effet avec une offre Tempo, dont les heures creuses restent de 22h à 6h toute l'année (hors réforme)
+
+## 2.15.1.9
+
+- Heures creuses saisonnières (bêta) : plages d'hiver (1er novembre → 31 mars) et d'été (1er avril → 31 octobre) à partir d'une date, à saisir dans la carte du PDL ; utilisées par les pages Consommation et l'export Home Assistant, l'historique garde ses anciennes heures creuses
+
+## 2.15.1.8
+
+- PDL de production seule (revente totale) : plus de synchro de consommation quand le PDL n'en a pas, production bornée à la mise en service du PDL, arrêt de la courbe sur ADAM-DC-0007 (quota de la passerelle préservé)
+
+## 2.15.1.7
+
+- Tempo : HC, HP et coûts du capteur linky-card à -1 quand la passerelle ne donne pas l'option tarifaire (offre choisie prise en compte, heures creuses 22h-6h par défaut)
+
+## 2.15.1.6
+
+- Page Exporter après une réinstallation de l'add-on : l'ancienne configuration Home Assistant, MQTT ou VictoriaMetrics restait affichée depuis le cache du navigateur, et l'enregistrement ou le test (« Auto Discovery ») répondait 404. La liste des configurations d'export n'est plus mise en cache et elle est relue à chaque ouverture de la page (issue #29).
+
+## 2.15.1.5
+
+- Carte Linky (capteur sensor.myelectricaldata_linky_<pdl>_consumption) avec une offre Tempo : les coûts jour par jour (dailyweek_cost, dailyweek_costHC, dailyweek_costHP) et le coût d'hier (daily_cost) sont maintenant calculés au prix de la couleur Tempo de chaque demi-heure, au lieu de -1 et 0 (issue #32).
+
+## 2.15.1.4
+
+- Courbe de charge non souscrite chez Enedis (ADAM-ERR0191, par exemple la production d'un contrat en revente totale) : la synchro ne redemande plus chaque jour les deux ans d'historique et ne consomme plus tout le quota de la passerelle (1000/1000), qui bloquait aussi le PDL de consommation. Elle s'arrête à la première semaine sans service et réessaie après 7 jours (issue #34).
+
+## 2.15.1.3
+
+- Export Home Assistant : nouveau bloc « Capteurs à créer » dans la carte Home Assistant de la page Exporter. Trois cases, cochées par défaut, choisissent les capteurs publiés : RTE Tempo, EDF Tempo et EDF Zen Flex. Un groupe décoché n'est plus publié et ses capteurs disparaissent de Home Assistant au prochain export (issue amont #209).
+
+## 2.15.1.2
+
+- Démarrage après la restauration d'une sauvegarde : les droits des fichiers PostgreSQL (base et journal) sont rendus automatiquement à l'utilisateur postgres, et le verrou laissé par un arrêt brutal est supprimé. Corrige « cannot create /data/pglog/postgres.log: Permission denied ». (La 2.15.1.1 ne contenait pas encore la correction.)
+
+## 2.15.1.1
+
+- Démarrage après la restauration d'une sauvegarde : les droits des fichiers PostgreSQL (base et journal) sont rendus automatiquement à l'utilisateur postgres, et le verrou laissé par un arrêt brutal est supprimé. Corrige « cannot create /data/pglog/postgres.log: Permission denied ».
+
 ## 2.15.1
 
-Basé sur MyElectricalData 2.15.1 ([notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.15.1)) : correction des doublons de relevés quotidiens.
-
-**Corrections**
-
-- Une seule ligne par jour pour les relevés quotidiens : en cas de doublon, la plus récente est gardée.
-- Migration de la base : purge des doublons quotidiens existants et index unique partiel sous PostgreSQL < 15 (faites une sauvegarde avant la mise à jour).
-- L'écriture quotidienne ne crée plus de doublon sous PostgreSQL < 15.
-- Import des données V1 et tests de doublons compatibles avec PostgreSQL 14.
+- Basé sur MyElectricalData 2.15.1 : [notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.15.1).
 
 ## 2.15.0
 
