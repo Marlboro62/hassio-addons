@@ -1,8 +1,8 @@
 diff --git a/apps/api/src/services/exporters/home_assistant.py b/apps/api/src/services/exporters/home_assistant.py
-index 440aa70..7692c17 100644
+index 12aaa21..93f4b33 100644
 --- a/apps/api/src/services/exporters/home_assistant.py
 +++ b/apps/api/src/services/exporters/home_assistant.py
-@@ -1455,6 +1455,14 @@ class HomeAssistantExporter(BaseExporter):
+@@ -1476,6 +1476,14 @@ class HomeAssistantExporter(BaseExporter):
          tariff_info, offpeak_ranges, subscribed_power_kva = await self._get_pdl_contract_info(db, pdl)
          weekend_offpeak = tariff_info.weekend_offpeak
  
@@ -17,7 +17,7 @@ index 440aa70..7692c17 100644
          # =====================================================================
          # BATCH QUERIES (minimiser les allers-retours DB)
          # =====================================================================
-@@ -1473,7 +1481,8 @@ class HomeAssistantExporter(BaseExporter):
+@@ -1494,7 +1502,8 @@ class HomeAssistantExporter(BaseExporter):
          tempo_colors: dict[str, str] = {}
          result = await db.execute(
              select(TempoDay.id, TempoDay.color)
@@ -27,7 +27,7 @@ index 440aa70..7692c17 100644
              .where(TempoDay.id <= max_date.isoformat())
          )
          for row in result.all():
-@@ -1506,6 +1515,8 @@ class HomeAssistantExporter(BaseExporter):
+@@ -1535,6 +1544,8 @@ class HomeAssistantExporter(BaseExporter):
          daily_mp: dict[date, float] = {}  # kW
          daily_mp_time: dict[date, str | None] = {}
          daily_mp_over: dict[date, bool] = {}
@@ -36,17 +36,17 @@ index 440aa70..7692c17 100644
  
          for day_date, intervals in detailed_by_day.items():
              hp_wh = 0
-@@ -1513,6 +1524,9 @@ class HomeAssistantExporter(BaseExporter):
-             slot_minutes = infer_interval_minutes(start for start, _ in intervals)
+@@ -1544,6 +1555,9 @@ class HomeAssistantExporter(BaseExporter):
+             day_minutes = infer_interval_minutes(start for start, _, step in intervals if not step)
              max_power_kw = 0.0
              max_time: str | None = None
 +            cost_hc_eur = 0.0
 +            cost_hp_eur = 0.0
 +            tempo_known = bool(tempo_prices) and has_offpeak
  
-             for interval_start, value in intervals:
-                 # Les valeurs DETAILED sont en W (puissance moyenne sur 30min)
-@@ -1528,6 +1542,17 @@ class HomeAssistantExporter(BaseExporter):
+             for interval_start, value, step_minutes in intervals:
+                 # Les valeurs DETAILED sont en W (puissance moyenne sur le créneau) :
+@@ -1561,6 +1575,17 @@ class HomeAssistantExporter(BaseExporter):
                  hc_wh += wh * fraction
                  hp_wh += wh * (1 - fraction)
  
@@ -64,7 +64,7 @@ index 440aa70..7692c17 100644
                  # Puissance max (W → kW)
                  power_kw = value / 1000
                  if power_kw > max_power_kw:
-@@ -1536,6 +1561,8 @@ class HomeAssistantExporter(BaseExporter):
+@@ -1569,6 +1594,8 @@ class HomeAssistantExporter(BaseExporter):
  
              daily_hp[day_date] = int(hp_wh)
              daily_hc[day_date] = int(hc_wh)
@@ -73,7 +73,7 @@ index 440aa70..7692c17 100644
              daily_mp[day_date] = round(max_power_kw, 2)
              daily_mp_time[day_date] = max_time
              daily_mp_over[day_date] = (
-@@ -1563,7 +1590,9 @@ class HomeAssistantExporter(BaseExporter):
+@@ -1596,7 +1623,9 @@ class HomeAssistantExporter(BaseExporter):
              yesterday_hc_kwh = -1
  
          # Coût journalier (HC*prix_HC + HP*prix_HP si dispo, sinon total*prix_base)
@@ -84,7 +84,7 @@ index 440aa70..7692c17 100644
              daily_cost = round(yesterday_hc_kwh * kwh_price_hc + yesterday_hp_kwh * kwh_price_hp, 2)
          elif kwh_price > 0:
              daily_cost = round(yesterday_kwh * kwh_price, 2)
-@@ -1720,23 +1749,26 @@ class HomeAssistantExporter(BaseExporter):
+@@ -1753,23 +1782,26 @@ class HomeAssistantExporter(BaseExporter):
                  hc_kwh = round(daily_hc[day] / 1000, 2)
                  hc_newest.append(str(hc_kwh))
                  hp_newest.append(str(hp_kwh))
