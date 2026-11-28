@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.15.5.1
+
+- Synchro : plus de plantage (« greenlet_spawn has not been called ») après une erreur de la passerelle, et arrêt à la première plage sur un 429 d'Enedis ou un 503 de la passerelle au lieu d'une rafale de requêtes ; nouvel essai à la prochaine synchro (issue amont #229)
+
 ## 2.15.5
 
 - Basé sur MyElectricalData 2.15.5 : [notes de version amont](https://github.com/MyElectricalData/myelectricaldata_new/releases/tag/2.15.5).
