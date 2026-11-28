@@ -1,0 +1,176 @@
+From 0395514770ef1e1d053fcc510c8911653cb12496 Mon Sep 17 00:00:00 2001
+From: Marlboro62 <195607976+Marlboro62@users.noreply.github.com>
+Date: Sat, 28 Nov 2026 17:37:00 +0100
+Subject: [PATCH] =?UTF-8?q?fix(sync):=20erreur=20de=20la=20passerelle=20sa?=
+ =?UTF-8?q?ns=20plantage,=20arr=C3=AAt=20sur=20429=20Enedis=20et=20503?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- Après le rollback d'une requête en erreur, sync_status (expiré) était relu :
+  chargement implicite interdit en asynchrone (« greenlet_spawn has not been
+  called »), puis session bloquée pour tous les types suivants du PDL. Il est
+  désormais rechargé, comme dans la synchro de la puissance max.
+- 429 d'Enedis relayé par la passerelle (ENEDIS_ERROR « 429 Too Many
+  Requests ») ou passerelle indisponible (5xx) : la synchro du type s'arrête à
+  la première plage au lieu d'enchaîner toutes les suivantes en rafale ; nouvel
+  essai à la prochaine synchro.
+(issue MyElectricalData/myelectricaldata_new#229)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ apps/api/src/services/sync.py                 | 28 ++++++++
+ .../tests/unit/test_sync_erreur_passerelle.py | 69 +++++++++++++++++++
+ 2 files changed, 97 insertions(+)
+ create mode 100644 apps/api/tests/unit/test_sync_erreur_passerelle.py
+
+diff --git a/apps/api/src/services/sync.py b/apps/api/src/services/sync.py
+index 769c681..f346240 100644
+--- a/apps/api/src/services/sync.py
++++ b/apps/api/src/services/sync.py
+@@ -104,6 +104,19 @@ def _is_no_data(response: Any) -> bool:
+     return NO_DATA_CODE in str(response.get("error") or "")
+ 
+ 
++def _is_enedis_throttled(response: Any) -> bool:
++    """Enedis limite le débit (HTTP 429), relayé par la passerelle en ENEDIS_ERROR (issue amont #229)
++
++    Ce n'est pas le quota de la passerelle : les plages suivantes seraient refusées de la même façon,
++    et les demander en rafale prolonge le bridage. La synchro du type s'arrête, nouvel essai à la suivante.
++    """
++    if not isinstance(response, dict) or response.get("success") is not False:
++        return False
++    error = response.get("error")
++    message = str(error.get("message") or "") if isinstance(error, dict) else str(error or "")
++    return "429 Too Many Requests" in message or "Message throttled out" in message
++
++
+ def _no_service_before(sync_status: Any, now: datetime) -> date | None:
+     """Date avant laquelle la courbe de charge n'existe pas chez Enedis (non souscrite, ADAM-ERR0191, ou
+     absente, NO_DATA), mémorisée depuis moins de NO_SERVICE_RETRY"""
+@@ -1183,6 +1196,14 @@ class SyncService:
+                             f"({current_start} - {current_end}): error={response.get('error')}"
+                         )
+ 
++                    if _is_enedis_throttled(response):
++                        logger.warning(
++                            f"[SYNC] {data_type}/{granularity.value} pour {usage_point_id} : Enedis limite le débit "
++                            f"(HTTP 429). Plages suivantes reportées à la prochaine synchro."
++                        )
++                        errors.append("Enedis limite le débit (HTTP 429), nouvel essai à la prochaine synchro")
++                        break
++
+                     if granularity == DataGranularity.DETAILED and _is_no_service(response):
+                         # Aucune courbe de charge souscrite jusqu'à cette semaine : les semaines plus
+                         # anciennes ne le sont pas non plus, inutile de les demander
+@@ -1255,6 +1276,8 @@ class SyncService:
+ 
+                 except RateLimitExceededError as e:
+                     await self.db.rollback()
++                    # Le rollback expire sync_status : le relire sans le recharger plante en asynchrone
++                    await self.db.refresh(sync_status)
+                     rate_limit_error = e
+                     logger.warning(
+                         f"[SYNC] Quota Enedis/passerelle atteint pour {usage_point_id} "
+@@ -1264,11 +1287,15 @@ class SyncService:
+                     break
+                 except Exception as e:
+                     await self.db.rollback()
++                    await self.db.refresh(sync_status)
+                     logger.warning(
+                         f"[SYNC] Erreur fetch {data_type}/{granularity.value} "
+                         f"pour {usage_point_id} ({current_start} - {current_end}): {e}"
+                     )
+                     errors.append(str(e))
++                    if isinstance(e, httpx.HTTPStatusError) and e.response.status_code >= 500:
++                        # Passerelle indisponible : inutile d'enchaîner les plages suivantes
++                        break
+ 
+             # Update sync status
+             if rate_limit_error:
+@@ -1314,6 +1341,7 @@ class SyncService:
+ 
+         except Exception as e:
+             await self.db.rollback()
++            await self.db.refresh(sync_status)
+             sync_status.status = SyncStatusType.FAILED
+             sync_status.error_message = str(e)
+             sync_status.error_count = (sync_status.error_count or 0) + 1
+diff --git a/apps/api/tests/unit/test_sync_erreur_passerelle.py b/apps/api/tests/unit/test_sync_erreur_passerelle.py
+new file mode 100644
+index 0000000..fc1d4b3
+--- /dev/null
++++ b/apps/api/tests/unit/test_sync_erreur_passerelle.py
+@@ -0,0 +1,69 @@
++"""Passerelle en erreur (503) pendant une synchro : la base ne doit pas planter (issue amont #229)
++
++Après le rollback d'une requête en erreur, la synchro relisait sync_status, expiré par le rollback :
++chargement implicite interdit en asynchrone (« greenlet_spawn has not been called »), puis
++« This Session's transaction has been rolled back » sur tous les types suivants du PDL.
++"""
++
++from datetime import date, timedelta
++
++import httpx
++from sqlalchemy.ext.asyncio import AsyncSession
++
++from src.adapters.myelectricaldata import GatewayHTTPError
++from src.models.client_mode import DataGranularity, SyncStatusType
++from tests.unit.test_sync_courbe_no_data import PRM, add_curve, db, make_service  # noqa: F401
++
++
++def erreur_503() -> GatewayHTTPError:
++    request = httpx.Request("GET", "https://passerelle.example/api/enedis/consumption/detail")
++    response = httpx.Response(503, request=request)
++    return GatewayHTTPError("Passerelle MyElectricalData indisponible (HTTP 503)", request=request, response=response)
++
++
++async def test_passerelle_503_courbe_statut_enregistre(db: AsyncSession) -> None:
++    today = date.today()
++    await add_curve(db, today - timedelta(days=30), today - timedelta(days=4))
++    service = make_service(db)
++    service.adapter.get_consumption_detail.side_effect = erreur_503()
++
++    synced = await service._sync_consumption_detail(PRM)
++
++    assert synced == 0
++    status = await service._get_or_create_sync_status(PRM, "consumption", DataGranularity.DETAILED)
++    assert status.status == SyncStatusType.PARTIAL
++    assert "indisponible" in (status.error_message or "")
++    assert status.error_count >= 1
++
++
++ENEDIS_429 = {
++    "success": False,
++    "error": {
++        "code": "ENEDIS_ERROR",
++        "message": "Failed to fetch 2023-11-29 to 2024-11-28: Client error '429 Too Many Requests' for url "
++        "'https://gw.ext.prod.api.enedis.fr/mesure_synchrone_auto/v2/consommation_quotidienne?pointId=X'",
++        "field": None,
++    },
++}
++
++
++async def test_passerelle_503_une_seule_requete(db: AsyncSession) -> None:
++    """Passerelle indisponible : arrêt à la première plage au lieu d'une centaine en rafale"""
++    service = make_service(db)
++    service.adapter.get_consumption_detail.side_effect = erreur_503()
++
++    await service._sync_consumption_detail(PRM)  # aucune courbe : ~104 semaines manquantes
++
++    assert service.adapter.get_consumption_detail.call_count == 1
++
++
++async def test_enedis_429_arrete_la_synchro_du_type(db: AsyncSession) -> None:
++    service = make_service(db)
++    service.adapter.get_consumption_detail.return_value = ENEDIS_429
++
++    await service._sync_consumption_detail(PRM)
++
++    assert service.adapter.get_consumption_detail.call_count == 1
++    status = await service._get_or_create_sync_status(PRM, "consumption", DataGranularity.DETAILED)
++    assert status.status == SyncStatusType.PARTIAL
++    assert "HTTP 429" in status.error_message
+-- 
+2.55.0.windows.5
+
